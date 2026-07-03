@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenWith Manager</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Windows utility</p>
+          <h1>OpenWith Manager</h1>
+        </div>
+        <div class="actions">
+          <button id="refreshButton" class="icon-button" title="Refresh associations">Refresh</button>
+          <button id="exportButton" class="secondary">Export</button>
+          <button id="importButton" class="secondary">Import</button>
+          <button id="settingsButton" class="primary">Open Settings</button>
+        </div>
+      </section>
+
+      <section class="toolbar">
+        <label class="search">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Extension, app, category..." autocomplete="off" />
+        </label>
+        <div id="categoryFilters" class="filters"></div>
+      </section>
+
+      <section class="content">
+        <aside class="summary">
+          <div>
+            <span class="metric" id="totalCount">0</span>
+            <p>tracked extensions</p>
+          </div>
+          <div>
+            <span class="metric" id="userChoiceCount">0</span>
+            <p>explicit user choices</p>
+          </div>
+          <div>
+            <span class="metric" id="unknownCount">0</span>
+            <p>unknown defaults</p>
+          </div>
+        </aside>
+
+        <section class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Extension</th>
+                <th>Type</th>
+                <th>Default app / ProgID</th>
+                <th>Source</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="associationRows"></tbody>
+          </table>
+          <div id="emptyState" class="empty" hidden>No matching associations.</div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="importDialog">
+      <form method="dialog">
+        <header>
+          <h2>Import comparison</h2>
+          <button value="close" class="plain">Close</button>
+        </header>
+        <div id="importSummary" class="dialogSummary"></div>
+        <div id="diffRows" class="diffRows"></div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
