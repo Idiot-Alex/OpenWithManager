@@ -37,7 +37,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -126,6 +127,17 @@ button {
   transition: border-color .16s ease, box-shadow .16s ease;
 }
 
+.language-picker select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  padding: 0 32px 0 11px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .search input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgb(47 118 104 / .14);
@@ -177,6 +189,7 @@ button {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 summary:focus-visible {
   outline: 3px solid rgb(47 118 104 / .2);
   outline-offset: 2px;

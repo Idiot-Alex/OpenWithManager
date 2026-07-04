@@ -1,3 +1,6 @@
+const i18n = window.openWithI18n;
+const t = (key, params, fallback) => i18n.t(key, params, fallback);
+
 const state = {
   fileKinds: [],
   query: "",
@@ -10,6 +13,18 @@ const pending = new Map();
 const host = window.chrome?.webview;
 
 const elements = {
+  appTitle: document.querySelector("#appTitle"),
+  appTagline: document.querySelector("#appTagline"),
+  searchLabel: document.querySelector(".search .sr-only"),
+  actions: document.querySelector("#actions"),
+  languageLabel: document.querySelector("#languageLabel"),
+  languageSelect: document.querySelector("#languageSelect"),
+  refreshButton: document.querySelector("#refreshButton"),
+  exportButton: document.querySelector("#exportButton"),
+  importButton: document.querySelector("#importButton"),
+  settingsButton: document.querySelector("#settingsButton"),
+  kindListSection: document.querySelector("#kindListSection"),
+  fileKindsLabel: document.querySelector("#fileKindsLabel"),
   statusFilters: document.querySelector("#statusFilters"),
   kindList: document.querySelector("#kindList"),
   detailPanel: document.querySelector("#detailPanel"),
@@ -17,6 +32,8 @@ const elements = {
   search: document.querySelector("#searchInput"),
   toast: document.querySelector("#toast"),
   importDialog: document.querySelector("#importDialog"),
+  dialogTitle: document.querySelector("#dialogTitle"),
+  closeDialogButton: document.querySelector("#closeDialogButton"),
   importSummary: document.querySelector("#importSummary"),
   diffRows: document.querySelector("#diffRows"),
 };
@@ -31,7 +48,7 @@ if (host) {
     if (response.ok) {
       callbacks.resolve(response.data);
     } else {
-      callbacks.reject(new Error(response.error || "Unknown bridge error"));
+      callbacks.reject(new Error(response.error || t("unknownBridgeError")));
     }
   });
 }
@@ -40,11 +57,16 @@ document.querySelector("#refreshButton").addEventListener("click", loadFileKinds
 document.querySelector("#settingsButton").addEventListener("click", openDefaultSettings);
 document.querySelector("#exportButton").addEventListener("click", exportConfig);
 document.querySelector("#importButton").addEventListener("click", importConfig);
+elements.languageSelect.addEventListener("change", (event) => {
+  i18n.setLanguage(event.target.value);
+  render();
+});
 elements.search.addEventListener("input", (event) => {
   state.query = event.target.value.trim().toLowerCase();
   render();
 });
 
+renderStaticText();
 renderFilters();
 loadFileKinds();
 
@@ -67,7 +89,7 @@ async function exportConfig() {
   try {
     const result = await callHost("config:export");
     if (!result.cancelled) {
-      showToast(`Exported ${result.count} file associations.`);
+      showToast(t("exportToast", { count: result.count }));
     }
   } catch (error) {
     showToast(error.message);
@@ -79,7 +101,7 @@ async function importConfig() {
     const result = await callHost("config:import");
     if (result.cancelled) return;
 
-    elements.importSummary.textContent = `${result.count} imported associations compared with this PC.`;
+    elements.importSummary.textContent = t("importedSummary", { count: result.count });
     elements.diffRows.innerHTML = result.diff.map(renderDiff).join("");
     elements.importDialog.showModal();
   } catch (error) {
@@ -88,6 +110,8 @@ async function importConfig() {
 }
 
 function render() {
+  renderStaticText();
+
   const visible = filteredFileKinds();
 
   if (!visible.some((kind) => kind.id === state.selectedId)) {
@@ -106,6 +130,36 @@ function render() {
 
   renderDetail();
   renderFilters();
+}
+
+function renderStaticText() {
+  const language = i18n.getLanguage();
+  document.documentElement.lang = language;
+  document.title = t("appTitle");
+
+  setText(elements.appTitle, t("appTitle"));
+  setText(elements.appTagline, t("appTagline"));
+  setText(elements.searchLabel, t("searchLabel"));
+  setText(elements.languageLabel, t("language"));
+  setText(elements.refreshButton, t("refresh"));
+  setText(elements.exportButton, t("export"));
+  setText(elements.importButton, t("compare"));
+  setText(elements.settingsButton, t("openSettings"));
+  setText(elements.fileKindsLabel, t("fileKinds"));
+  setText(elements.empty, t("emptyNoMatch"));
+  setText(elements.dialogTitle, t("snapshotComparison"));
+  setText(elements.closeDialogButton, t("close"));
+
+  elements.search.placeholder = t("searchPlaceholder");
+  elements.actions.setAttribute("aria-label", t("actionsLabel"));
+  elements.languageSelect.setAttribute("aria-label", t("language"));
+  elements.kindListSection.setAttribute("aria-label", t("fileKinds"));
+  elements.statusFilters.setAttribute("aria-label", t("filterFileKinds"));
+  elements.detailPanel.setAttribute("aria-label", t("selectedFileKind"));
+
+  if (elements.languageSelect.value !== language) {
+    elements.languageSelect.value = language;
+  }
 }
 
 function renderFilters() {
@@ -136,6 +190,9 @@ function filteredFileKinds() {
   return state.fileKinds.filter((kind) => {
     const matchesStatus = state.status === "All" || needsReview(kind);
     const text = [
+      kindTitle(kind),
+      kindShortName(kind),
+      kindDescription(kind),
       kind.displayName,
       kind.shortName,
       kind.description,
@@ -159,16 +216,16 @@ function filteredFileKinds() {
 function renderKindRow(kind) {
   const selected = kind.id === state.selectedId ? " selected" : "";
   const status = statusDisplay(kind);
-  const app = kind.primaryAppName || "No default app";
+  const app = appName(kind.primaryAppName);
 
   return `
     <button class="kind-row${selected}" type="button" data-kind-id="${escapeAttribute(kind.id)}">
-      <span class="kind-icon">${escapeHtml(kind.shortName.slice(0, 2))}</span>
+      <span class="kind-icon">${escapeHtml(kindShortName(kind).slice(0, 2))}</span>
       <span class="kind-main">
-        <strong>${escapeHtml(kind.displayName)}</strong>
+        <strong>${escapeHtml(kindTitle(kind))}</strong>
       </span>
       <span class="kind-app">${renderAppIdentity(app, kind.primaryIconDataUrl)}</span>
-      <span class="${status.classes}">${status.label}</span>
+      <span class="${status.classes}">${escapeHtml(status.label)}</span>
     </button>
   `;
 }
@@ -178,24 +235,24 @@ function renderDetail() {
   if (!kind) {
     elements.detailPanel.innerHTML = `
       <div class="detail-empty">
-        <h2>No file kind selected</h2>
-        <p>Pick a file kind to see its current app.</p>
+        <h2>${escapeHtml(t("noFileKindSelected"))}</h2>
+        <p>${escapeHtml(t("pickFileKind"))}</p>
       </div>
     `;
     return;
   }
 
   const status = statusDisplay(kind);
-  const app = kind.primaryAppName || "No default app";
+  const app = appName(kind.primaryAppName);
   const outliers = kind.outliers || [];
 
   elements.detailPanel.innerHTML = `
     <div class="detail-head">
       <div>
-        <p class="eyebrow">File kind</p>
-        <h2>${escapeHtml(kind.displayName)}</h2>
+        <p class="eyebrow">${escapeHtml(t("fileKind"))}</p>
+        <h2>${escapeHtml(kindTitle(kind))}</h2>
       </div>
-      <span class="${status.classes}">${status.label}</span>
+      <span class="${status.classes}">${escapeHtml(status.label)}</span>
     </div>
 
     <section class="answer">
@@ -204,7 +261,7 @@ function renderDetail() {
     </section>
 
     <div class="format-block">
-      <p class="section-label">Included formats</p>
+      <p class="section-label">${escapeHtml(t("includedFormats"))}</p>
       <div class="chips">
         ${(kind.extensions || []).map((extension) => `<span>${escapeHtml(extension.replace(".", "").toUpperCase())}</span>`).join("")}
       </div>
@@ -213,13 +270,13 @@ function renderDetail() {
     ${outliers.length > 0 ? renderOutliers(outliers) : ""}
 
     <div class="detail-actions">
-      <button class="button primary" type="button" id="changeAppButton">Choose app</button>
-      <button class="button secondary" type="button" id="openSettingsButton">Open default apps</button>
+      <button class="button primary" type="button" id="changeAppButton">${escapeHtml(t("chooseApp"))}</button>
+      <button class="button secondary" type="button" id="openSettingsButton">${escapeHtml(t("openDefaultApps"))}</button>
     </div>
-    <p class="settings-hint">Windows Settings will open.</p>
+    <p class="settings-hint">${escapeHtml(t("settingsHint"))}</p>
 
     <details class="technical">
-      <summary>Technical details</summary>
+      <summary>${escapeHtml(t("technicalDetails"))}</summary>
       <div class="technical-list">
         ${(kind.items || []).map(renderTechnicalItem).join("")}
       </div>
@@ -241,11 +298,11 @@ async function openDefaultSettings() {
 function renderOutliers(outliers) {
   return `
     <section class="outliers">
-      <p class="section-label">Exceptions</p>
+      <p class="section-label">${escapeHtml(t("exceptions"))}</p>
       ${outliers.map((item) => `
         <div class="outlier">
           <strong>${escapeHtml(item.extension.toUpperCase())}</strong>
-          <span>${escapeHtml(item.appName || "No default app")}</span>
+          <span>${escapeHtml(appName(item.appName))}</span>
         </div>
       `).join("")}
     </section>
@@ -258,33 +315,33 @@ function needsReview(kind) {
 
 function openingText(kind) {
   if (kind.status === "Missing") {
-    return "No default app reported";
+    return t("noDefaultAppReported");
   }
 
   return kind.status === "Mixed"
-    ? `${kind.displayName} mostly open with`
-    : `${kind.displayName} open with`;
+    ? t("mostlyOpenWith", { name: kindTitle(kind) })
+    : t("openWith", { name: kindTitle(kind) });
 }
 
 function exceptionLabel(kind) {
   const exceptionCount = (kind.outliers || []).length;
   if (exceptionCount === 1) {
-    return "1 exception";
+    return t("oneException");
   }
 
   if (exceptionCount > 1) {
-    return `${exceptionCount} exceptions`;
+    return t("exceptionsCount", { count: exceptionCount });
   }
 
-  return "Has exceptions";
+  return t("hasExceptions");
 }
 
 function renderTechnicalItem(item) {
   return `
     <div class="technical-row">
       <strong>${escapeHtml(item.extension)}</strong>
-      <span>${escapeHtml(item.friendlyName || item.progId || "No default app")}</span>
-      <code>${escapeHtml(item.progId || "none")}</code>
+      <span>${escapeHtml(appName(item.friendlyName || item.progId))}</span>
+      <code>${escapeHtml(item.progId || t("none"))}</code>
       <em>${escapeHtml(sourceLabel(item.source))}</em>
     </div>
   `;
@@ -297,10 +354,10 @@ function renderDiff(item) {
     <div class="diff-row">
       <strong>${escapeHtml(item.extension)}</strong>
       <div>
-        <span>Current: ${escapeHtml(item.currentProgId || "none")}</span>
-        <span>Snapshot: ${escapeHtml(item.importedProgId || "none")}</span>
+        <span>${escapeHtml(t("current"))}: ${escapeHtml(item.currentProgId || t("none"))}</span>
+        <span>${escapeHtml(t("snapshot"))}: ${escapeHtml(item.importedProgId || t("none"))}</span>
       </div>
-      <span class="${status.classes}">${status.label}</span>
+      <span class="${status.classes}">${escapeHtml(status.label)}</span>
     </div>
   `;
 }
@@ -311,15 +368,15 @@ function setLoading() {
   `).join("");
   elements.detailPanel.innerHTML = `
     <div class="detail-empty">
-      <h2>Reading defaults</h2>
-      <p>Checking the apps Windows uses for your files.</p>
+      <h2>${escapeHtml(t("readingDefaultsTitle"))}</h2>
+      <p>${escapeHtml(t("readingDefaultsBody"))}</p>
     </div>
   `;
 }
 
 function callHost(action, payload = {}) {
   if (!host) {
-    return Promise.reject(new Error("OpenWith Manager is not connected to the Windows host."));
+    return Promise.reject(new Error(t("hostDisconnected")));
   }
 
   const id = crypto.randomUUID();
@@ -351,41 +408,63 @@ function statusDisplay(kind) {
   }
 
   if (kind.status === "Missing") {
-    return { label: "No app set", classes: "status missing" };
+    return { label: t("noAppSet"), classes: "status missing" };
   }
 
-  return { label: "All set", classes: "status consistent" };
+  return { label: t("allSet"), classes: "status consistent" };
 }
 
 function diffStatusDisplay(status) {
   if (status === "Different") {
-    return { label: "Changed", classes: "status mixed" };
+    return { label: t("changed"), classes: "status mixed" };
   }
 
   if (status === "Missing locally") {
-    return { label: "Missing here", classes: "status missing" };
+    return { label: t("missingHere"), classes: "status missing" };
   }
 
-  return { label: "Same", classes: "status consistent" };
+  return { label: t("same"), classes: "status consistent" };
 }
 
 function statusLabel(status) {
   return {
-    All: "All",
-    Review: "Needs review",
+    All: t("all"),
+    Review: t("needsReview"),
   }[status] || status;
 }
 
 function sourceLabel(source) {
   return {
-    UserChoice: "Set by you",
-    Registry: "System default",
-    Unknown: "Not found",
+    UserChoice: t("setByYou"),
+    Registry: t("systemDefault"),
+    Unknown: t("notFound"),
   }[source] || source;
+}
+
+function kindTitle(kind) {
+  return t(`kind.${kind.id}.name`, {}, kind.displayName);
+}
+
+function kindShortName(kind) {
+  return t(`kind.${kind.id}.short`, {}, kind.shortName);
+}
+
+function kindDescription(kind) {
+  return t(`kind.${kind.id}.description`, {}, kind.description);
+}
+
+function appName(name) {
+  return !name || name === "No default app" ? t("noDefaultApp") : name;
 }
 
 function appInitial(name) {
   return (name || "?").trim().charAt(0).toUpperCase() || "?";
+}
+
+function setText(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
 }
 
 function showToast(message) {

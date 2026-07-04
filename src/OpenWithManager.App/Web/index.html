@@ -14,8 +14,8 @@
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">OW</span>
           <div>
-            <h1>OpenWith Manager</h1>
-            <p>Choose what should open each kind of file.</p>
+            <h1 id="appTitle">OpenWith Manager</h1>
+            <p id="appTagline">Choose what should open each kind of file.</p>
           </div>
         </div>
 
@@ -24,7 +24,14 @@
           <input id="searchInput" type="search" placeholder="Search files or apps" autocomplete="off" />
         </label>
 
-        <div class="actions" aria-label="Actions">
+        <div id="actions" class="actions" aria-label="Actions">
+          <label class="language-picker">
+            <span id="languageLabel" class="sr-only">Language</span>
+            <select id="languageSelect" aria-label="Language">
+              <option value="en">English</option>
+              <option value="zh-Hans">中文</option>
+            </select>
+          </label>
           <button id="refreshButton" class="button secondary" type="button">Refresh</button>
           <button id="exportButton" class="button secondary" type="button">Export</button>
           <button id="importButton" class="button secondary" type="button">Compare</button>
@@ -33,9 +40,9 @@
       </header>
 
       <section class="workspace">
-        <section class="kind-list" aria-label="File kinds">
+        <section id="kindListSection" class="kind-list" aria-label="File kinds">
           <header class="list-head">
-            <p class="section-label">File kinds</p>
+            <p id="fileKindsLabel" class="section-label">File kinds</p>
             <div id="statusFilters" class="filter-stack" aria-label="Filter file kinds"></div>
           </header>
           <div id="kindList"></div>
@@ -50,10 +57,10 @@
       <form method="dialog">
         <header class="dialog-head">
           <div>
-            <h2>Snapshot comparison</h2>
+            <h2 id="dialogTitle">Snapshot comparison</h2>
             <p id="importSummary"></p>
           </div>
-          <button value="close" class="button secondary">Close</button>
+          <button id="closeDialogButton" value="close" class="button secondary">Close</button>
         </header>
         <div class="dialog-body">
           <div id="diffRows" class="diff-list"></div>
@@ -62,6 +69,7 @@
     </dialog>
 
     <div id="toast" class="toast" hidden></div>
+    <script src="./i18n.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
