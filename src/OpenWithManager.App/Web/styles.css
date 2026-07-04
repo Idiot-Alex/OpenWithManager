@@ -28,7 +28,7 @@
 
 body {
   margin: 0;
-  min-width: 900px;
+  min-width: 0;
   background:
     linear-gradient(135deg, rgb(255 255 255 / .64), transparent 34rem),
     var(--bg);
@@ -66,7 +66,7 @@ button {
 
 .command-bar {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(260px, 500px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 500px) auto;
   align-items: center;
   gap: 14px;
   border: 1px solid var(--line);
@@ -184,12 +184,11 @@ summary:focus-visible {
 
 .workspace {
   display: grid;
-  grid-template-columns: 190px minmax(420px, 1fr) minmax(310px, 390px);
+  grid-template-columns: minmax(420px, 1fr) minmax(310px, 390px);
   gap: 16px;
   min-height: 0;
 }
 
-.rail,
 .kind-list,
 .detail {
   min-height: 0;
@@ -199,14 +198,6 @@ summary:focus-visible {
   box-shadow: 0 1px 0 rgb(255 255 255 / .75) inset;
 }
 
-.rail {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 12px;
-}
-
-.rail-label,
 .section-label,
 .eyebrow {
   margin: 0 0 8px;
@@ -217,19 +208,34 @@ summary:focus-visible {
   text-transform: uppercase;
 }
 
+.list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 10px 9px;
+}
+
+.list-head .section-label {
+  margin: 0;
+}
+
 .filter-stack {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .filter {
   display: flex;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
   min-height: 36px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 7px;
-  background: transparent;
+  background: #fff;
   color: var(--muted);
   padding: 0 9px;
   text-align: left;
@@ -242,8 +248,8 @@ summary:focus-visible {
 }
 
 .filter.active {
-  border-color: var(--line);
-  background: #fff;
+  border-color: var(--line-strong);
+  background: var(--panel-strong);
   color: var(--text);
 }
 
@@ -252,39 +258,19 @@ summary:focus-visible {
   font-size: 12px;
 }
 
-.summary-strip {
-  display: grid;
-  gap: 8px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.summary-strip div {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.summary-strip strong {
-  color: var(--text);
-  font-size: 18px;
-  line-height: 1;
-}
-
 .kind-list {
   overflow: auto;
-  padding: 8px;
 }
 
 #kindList {
   display: grid;
   gap: 6px;
+  padding: 8px;
 }
 
 .kind-row {
   display: grid;
-  grid-template-columns: 42px minmax(150px, 1fr) minmax(140px, .8fr) 92px;
+  grid-template-columns: 42px minmax(150px, 1fr) minmax(140px, .8fr) 104px;
   align-items: center;
   width: 100%;
   min-height: 66px;
@@ -398,6 +384,7 @@ summary:focus-visible {
   justify-content: center;
   align-items: center;
   min-height: 25px;
+  white-space: nowrap;
   border-radius: 6px;
   padding: 0 8px;
   font-size: 11px;
@@ -446,7 +433,8 @@ summary:focus-visible {
 
 .answer p,
 .answer span,
-.note span {
+.note span,
+.settings-hint {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -508,6 +496,10 @@ summary:focus-visible {
 .detail-actions {
   justify-content: flex-start;
   margin-top: 18px;
+}
+
+.settings-hint {
+  margin-top: 8px;
 }
 
 .technical {
@@ -661,10 +653,6 @@ dialog::backdrop {
 }
 
 @media (max-width: 1080px) {
-  body {
-    min-width: 760px;
-  }
-
   .command-bar {
     grid-template-columns: 1fr;
   }
@@ -672,12 +660,56 @@ dialog::backdrop {
   .actions {
     justify-content: flex-start;
   }
+}
 
+@media (max-width: 860px) {
   .workspace {
-    grid-template-columns: 160px minmax(360px, 1fr);
+    grid-template-columns: minmax(360px, 1fr);
   }
 
   .detail {
-    grid-column: 1 / -1;
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .kind-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    min-height: 58px;
+  }
+
+  .kind-app {
+    display: none;
+  }
+
+  .status {
+    padding: 0 7px;
+  }
+
+  .detail {
+    padding: 14px;
+  }
+
+  .detail-head {
+    align-items: flex-start;
   }
 }

@@ -33,24 +33,11 @@
       </header>
 
       <section class="workspace">
-        <aside class="rail" aria-label="Filters">
-          <div>
-            <p class="rail-label">Show</p>
-            <div id="statusFilters" class="filter-stack"></div>
-          </div>
-          <div class="summary-strip">
-            <div>
-              <strong id="totalKinds">0</strong>
-              <span>file kinds</span>
-            </div>
-            <div>
-              <strong id="needsReview">0</strong>
-              <span>need review</span>
-            </div>
-          </div>
-        </aside>
-
         <section class="kind-list" aria-label="File kinds">
+          <header class="list-head">
+            <p class="section-label">File kinds</p>
+            <div id="statusFilters" class="filter-stack" aria-label="Filter file kinds"></div>
+          </header>
           <div id="kindList"></div>
           <div id="emptyState" class="empty" hidden>No matching file kinds.</div>
         </section>

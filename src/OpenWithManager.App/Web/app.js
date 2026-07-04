@@ -5,7 +5,7 @@ const state = {
   selectedId: null,
 };
 
-const statusFilters = ["All", "Mixed", "Missing", "Consistent"];
+const statusFilters = ["All", "Review"];
 const pending = new Map();
 const host = window.chrome?.webview;
 
@@ -19,8 +19,6 @@ const elements = {
   importDialog: document.querySelector("#importDialog"),
   importSummary: document.querySelector("#importSummary"),
   diffRows: document.querySelector("#diffRows"),
-  totalKinds: document.querySelector("#totalKinds"),
-  needsReview: document.querySelector("#needsReview"),
 };
 
 if (host) {
@@ -96,8 +94,6 @@ function render() {
     state.selectedId = visible[0]?.id ?? state.fileKinds[0]?.id ?? null;
   }
 
-  elements.totalKinds.textContent = state.fileKinds.length;
-  elements.needsReview.textContent = state.fileKinds.filter((kind) => kind.status !== "Consistent").length;
   elements.kindList.innerHTML = visible.map(renderKindRow).join("");
   elements.empty.hidden = visible.length > 0;
 
@@ -118,7 +114,7 @@ function renderFilters() {
       const active = state.status === status ? " active" : "";
       const count = status === "All"
         ? state.fileKinds.length
-        : state.fileKinds.filter((kind) => kind.status === status).length;
+        : state.fileKinds.filter(needsReview).length;
       return `
         <button class="filter${active}" type="button" data-status="${status}">
           <span>${escapeHtml(statusLabel(status))}</span>
@@ -138,7 +134,7 @@ function renderFilters() {
 
 function filteredFileKinds() {
   return state.fileKinds.filter((kind) => {
-    const matchesStatus = state.status === "All" || kind.status === state.status;
+    const matchesStatus = state.status === "All" || needsReview(kind);
     const text = [
       kind.displayName,
       kind.shortName,
@@ -162,16 +158,14 @@ function filteredFileKinds() {
 
 function renderKindRow(kind) {
   const selected = kind.id === state.selectedId ? " selected" : "";
-  const status = statusDisplay(kind.status);
+  const status = statusDisplay(kind);
   const app = kind.primaryAppName || "No default app";
-  const coverage = `${kind.matchingFormats} of ${kind.totalFormats} formats`;
 
   return `
     <button class="kind-row${selected}" type="button" data-kind-id="${escapeAttribute(kind.id)}">
       <span class="kind-icon">${escapeHtml(kind.shortName.slice(0, 2))}</span>
       <span class="kind-main">
         <strong>${escapeHtml(kind.displayName)}</strong>
-        <span>${escapeHtml(coverage)}</span>
       </span>
       <span class="kind-app">${renderAppIdentity(app, kind.primaryIconDataUrl)}</span>
       <span class="${status.classes}">${status.label}</span>
@@ -191,7 +185,7 @@ function renderDetail() {
     return;
   }
 
-  const status = statusDisplay(kind.status);
+  const status = statusDisplay(kind);
   const app = kind.primaryAppName || "No default app";
   const outliers = kind.outliers || [];
 
@@ -205,9 +199,8 @@ function renderDetail() {
     </div>
 
     <section class="answer">
-      <p>Currently opens with</p>
+      <p>${escapeHtml(openingText(kind))}</p>
       ${renderAppIdentity(app, kind.primaryIconDataUrl, true)}
-      <span>${escapeHtml(kind.matchingFormats)} of ${escapeHtml(kind.totalFormats)} formats use this app.</span>
     </section>
 
     <div class="format-block">
@@ -217,12 +210,13 @@ function renderDetail() {
       </div>
     </div>
 
-    ${outliers.length > 0 ? renderOutliers(outliers) : renderConsistentNote(kind)}
+    ${outliers.length > 0 ? renderOutliers(outliers) : ""}
 
     <div class="detail-actions">
-      <button class="button primary" type="button" id="changeAppButton">Change app</button>
-      <button class="button secondary" type="button" id="openSettingsButton">Open settings</button>
+      <button class="button primary" type="button" id="changeAppButton">Choose app</button>
+      <button class="button secondary" type="button" id="openSettingsButton">Open default apps</button>
     </div>
+    <p class="settings-hint">Windows Settings will open.</p>
 
     <details class="technical">
       <summary>Technical details</summary>
@@ -258,13 +252,31 @@ function renderOutliers(outliers) {
   `;
 }
 
-function renderConsistentNote(kind) {
-  return `
-    <section class="note">
-      <strong>${escapeHtml(kind.shortName)} are consistent.</strong>
-      <span>Every tracked format in this group opens with the same app.</span>
-    </section>
-  `;
+function needsReview(kind) {
+  return kind.status !== "Consistent";
+}
+
+function openingText(kind) {
+  if (kind.status === "Missing") {
+    return "No default app reported";
+  }
+
+  return kind.status === "Mixed"
+    ? `${kind.displayName} mostly open with`
+    : `${kind.displayName} open with`;
+}
+
+function exceptionLabel(kind) {
+  const exceptionCount = (kind.outliers || []).length;
+  if (exceptionCount === 1) {
+    return "1 exception";
+  }
+
+  if (exceptionCount > 1) {
+    return `${exceptionCount} exceptions`;
+  }
+
+  return "Has exceptions";
 }
 
 function renderTechnicalItem(item) {
@@ -294,7 +306,7 @@ function renderDiff(item) {
 }
 
 function setLoading() {
-  elements.kindList.innerHTML = Array.from({ length: 7 }, (_, index) => `
+  elements.kindList.innerHTML = Array.from({ length: 11 }, (_, index) => `
     <div class="skeleton-row" style="--delay: ${index * 60}ms"></div>
   `).join("");
   elements.detailPanel.innerHTML = `
@@ -333,16 +345,16 @@ function renderAppIdentity(name, iconDataUrl, large = false) {
   `;
 }
 
-function statusDisplay(status) {
-  if (status === "Mixed") {
-    return { label: "Mixed", classes: "status mixed" };
+function statusDisplay(kind) {
+  if (kind.status === "Mixed") {
+    return { label: exceptionLabel(kind), classes: "status mixed" };
   }
 
-  if (status === "Missing") {
-    return { label: "Missing", classes: "status missing" };
+  if (kind.status === "Missing") {
+    return { label: "No app set", classes: "status missing" };
   }
 
-  return { label: "Consistent", classes: "status consistent" };
+  return { label: "All set", classes: "status consistent" };
 }
 
 function diffStatusDisplay(status) {
@@ -360,9 +372,7 @@ function diffStatusDisplay(status) {
 function statusLabel(status) {
   return {
     All: "All",
-    Mixed: "Needs review",
-    Missing: "No default",
-    Consistent: "Consistent",
+    Review: "Needs review",
   }[status] || status;
 }
 
@@ -419,13 +429,21 @@ function sampleFileKinds() {
       sampleItem(".mp3", "MP3 audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
       sampleItem(".wav", "WAV audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
     ]),
-    makeSampleKind("documents", "Documents", "Docs", "Office, PDF, text, and writing files.", [".pdf", ".txt", ".md", ".docx", ".xlsx", ".pptx"], "Microsoft Word", "Word.Document.12", "Mixed", [
+    makeSampleKind("pdf", "PDF documents", "PDF", "Portable documents and forms.", [".pdf"], "Adobe Acrobat", "AcroExch.Document", "Consistent", [
       sampleItem(".pdf", "PDF document", "Adobe Acrobat", "AcroExch.Document"),
+    ]),
+    makeSampleKind("word", "Word documents", "Word", "Microsoft Word documents.", [".docx"], "Microsoft Word", "Word.Document.12", "Consistent", [
+      sampleItem(".docx", "Word document", "Microsoft Word", "Word.Document.12"),
+    ]),
+    makeSampleKind("spreadsheets", "Spreadsheets", "Sheet", "Excel workbooks and spreadsheet files.", [".xlsx"], "Microsoft Excel", "Excel.Sheet.12", "Consistent", [
+      sampleItem(".xlsx", "Excel workbook", "Microsoft Excel", "Excel.Sheet.12"),
+    ]),
+    makeSampleKind("presentations", "Presentations", "Deck", "PowerPoint presentation files.", [".pptx"], "Microsoft PowerPoint", "PowerPoint.Show.12", "Consistent", [
+      sampleItem(".pptx", "PowerPoint presentation", "Microsoft PowerPoint", "PowerPoint.Show.12"),
+    ]),
+    makeSampleKind("notes", "Text and notes", "Text", "Plain text and Markdown notes.", [".txt", ".md"], "Visual Studio Code", "VSCode.md", "Mixed", [
       sampleItem(".txt", "Plain text", "Notepad", "txtfile", "Registry"),
       sampleItem(".md", "Markdown", "Visual Studio Code", "VSCode.md"),
-      sampleItem(".docx", "Word document", "Microsoft Word", "Word.Document.12"),
-      sampleItem(".xlsx", "Excel workbook", "Microsoft Excel", "Excel.Sheet.12"),
-      sampleItem(".pptx", "PowerPoint presentation", "Microsoft PowerPoint", "PowerPoint.Show.12"),
     ]),
     makeSampleKind("archives", "Compressed files", "Archives", "Zip, 7-Zip, and other packaged files.", [".zip", ".rar", ".7z"], "File Explorer", "CompressedFolder", "Mixed", [
       sampleItem(".zip", "ZIP archive", "File Explorer", "CompressedFolder", "Registry"),
