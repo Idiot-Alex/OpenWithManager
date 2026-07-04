@@ -57,7 +57,7 @@ async function exportConfig() {
   try {
     const result = await callHost("config:export");
     if (!result.cancelled) {
-      showToast(`Exported ${result.count} associations.`);
+      showToast(`Exported ${result.count} file types.`);
     }
   } catch (error) {
     showToast(error.message);
@@ -69,7 +69,7 @@ async function importConfig() {
     const result = await callHost("config:import");
     if (result.cancelled) return;
 
-    elements.importSummary.textContent = `Compared ${result.count} imported associations from ${result.path}. This version only compares; it does not modify Windows defaults.`;
+    elements.importSummary.textContent = `Compared ${result.count} imported file types from ${result.path}. This app only compares snapshots; Windows Settings still controls the default app changes.`;
     elements.diffRows.innerHTML = result.diff.map(renderDiff).join("");
     elements.importDialog.showModal();
   } catch (error) {
@@ -127,7 +127,7 @@ function renderRow(item) {
       <td>${escapeHtml(item.category)}</td>
       <td><strong>${name}</strong><div class="muted">${progId}</div></td>
       <td><span class="source ${escapeHtml(item.source)}">${escapeHtml(item.source)}</span></td>
-      <td><button class="rowAction" data-open-extension="${escapeHtml(item.extension)}">Manage</button></td>
+      <td><button class="rowAction" data-open-extension="${escapeHtml(item.extension)}">Open settings</button></td>
     </tr>
   `;
 }
