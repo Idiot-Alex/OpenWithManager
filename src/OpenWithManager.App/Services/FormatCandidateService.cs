@@ -22,7 +22,7 @@ public sealed class FormatCandidateService
         var candidates = new List<FormatAppCandidate>();
         if (currentItem is not null && !string.IsNullOrWhiteSpace(currentItem.FriendlyName ?? currentItem.ProgId))
         {
-            candidates.Add(ToCandidate(
+            candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,
                 currentItem.ProgId,
                 currentItem.IconDataUrl,
@@ -66,7 +66,7 @@ public sealed class FormatCandidateService
         foreach (var progId in key.GetValueNames().Where(value => !string.IsNullOrWhiteSpace(value)))
         {
             var appName = FileAssociationService.ReadFriendlyName(progId) ?? progId;
-            yield return ToCandidate(
+            yield return new FormatAppCandidate(
                 appName,
                 progId,
                 FileAssociationService.ReadIconDataUrl(progId),
@@ -94,7 +94,7 @@ public sealed class FormatCandidateService
             }
 
             var appName = ReadApplicationName(executableName) ?? executableName;
-            yield return ToCandidate(appName, null, null, "OpenWithList", false);
+            yield return new FormatAppCandidate(appName, null, null, "OpenWithList", false);
         }
     }
 
@@ -142,7 +142,7 @@ public sealed class FormatCandidateService
                 ?? FileAssociationService.ReadFriendlyName(progId)
                 ?? valueName;
 
-            yield return ToCandidate(
+            yield return new FormatAppCandidate(
                 appName,
                 progId,
                 FileAssociationService.ReadIconDataUrl(progId),
@@ -155,16 +155,6 @@ public sealed class FormatCandidateService
     {
         using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{executableName}\Application");
         return key?.GetValue("ApplicationName") as string;
-    }
-
-    private static FormatAppCandidate ToCandidate(
-        string appName,
-        string? progId,
-        string? iconDataUrl,
-        string source,
-        bool isCurrent)
-    {
-        return new FormatAppCandidate(appName, progId, iconDataUrl, source, isCurrent);
     }
 
     private static string CandidateKey(FormatAppCandidate candidate)

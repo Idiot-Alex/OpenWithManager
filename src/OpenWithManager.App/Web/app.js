@@ -83,14 +83,14 @@ loadFileKinds();
 async function loadFileKinds() {
   try {
     setLoading();
-    state.fileKinds = host ? await callHost("fileKinds:list") : sampleFileKinds();
+    state.fileKinds = await callHost("fileKinds:list");
     if (!state.selectedId || !state.fileKinds.some((kind) => kind.id === state.selectedId)) {
       state.selectedId = state.fileKinds[0]?.id ?? null;
     }
     render();
   } catch (error) {
     showToast(error.message);
-    state.fileKinds = host ? [] : sampleFileKinds();
+    state.fileKinds = [];
     render();
   }
 }
@@ -344,9 +344,7 @@ async function selectFormat(extension) {
   render();
 
   try {
-    const result = host
-      ? await callHost("formats:candidates", { extension })
-      : sampleFormatCandidates(extension);
+    const result = await callHost("formats:candidates", { extension });
 
     if (state.selectedFormat !== extension) {
       return;
@@ -741,170 +739,4 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
-}
-
-function sampleFileKinds() {
-  return [
-    makeSampleKind("images", "Photos and images", "Images", "Pictures, screenshots, and image assets.", [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"], "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "Mixed", [
-      sampleItem(".jpg", "JPEG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
-      sampleItem(".jpeg", "JPEG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
-      sampleItem(".png", "PNG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
-      sampleItem(".gif", "GIF image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
-      sampleItem(".webp", "WebP image", "Google Chrome", "ChromeHTML"),
-      sampleItem(".svg", "SVG image", "Visual Studio Code", "VSCode.svg"),
-    ]),
-    makeSampleKind("videos", "Videos", "Videos", "Movies, clips, and screen recordings.", [".mp4", ".mov", ".mkv"], "VLC media player", "VLC.mp4", "Consistent", [
-      sampleItem(".mp4", "MP4 video", "VLC media player", "VLC.mp4"),
-      sampleItem(".mov", "QuickTime video", "VLC media player", "VLC.mov"),
-      sampleItem(".mkv", "Matroska video", "VLC media player", "VLC.mkv"),
-    ]),
-    makeSampleKind("music", "Music and audio", "Audio", "Songs, recordings, and sound files.", [".mp3", ".wav"], "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs", "Consistent", [
-      sampleItem(".mp3", "MP3 audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
-      sampleItem(".wav", "WAV audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
-    ]),
-    makeSampleKind("pdf", "PDF documents", "PDF", "Portable documents and forms.", [".pdf"], "Adobe Acrobat", "AcroExch.Document", "Consistent", [
-      sampleItem(".pdf", "PDF document", "Adobe Acrobat", "AcroExch.Document"),
-    ]),
-    makeSampleKind("word", "Word documents", "Word", "Microsoft Word documents.", [".docx"], "Microsoft Word", "Word.Document.12", "Consistent", [
-      sampleItem(".docx", "Word document", "Microsoft Word", "Word.Document.12"),
-    ]),
-    makeSampleKind("spreadsheets", "Spreadsheets", "Sheet", "Excel workbooks and spreadsheet files.", [".xlsx"], "Microsoft Excel", "Excel.Sheet.12", "Consistent", [
-      sampleItem(".xlsx", "Excel workbook", "Microsoft Excel", "Excel.Sheet.12"),
-    ]),
-    makeSampleKind("presentations", "Presentations", "Deck", "PowerPoint presentation files.", [".pptx"], "Microsoft PowerPoint", "PowerPoint.Show.12", "Consistent", [
-      sampleItem(".pptx", "PowerPoint presentation", "Microsoft PowerPoint", "PowerPoint.Show.12"),
-    ]),
-    makeSampleKind("notes", "Text and notes", "Text", "Plain text and Markdown notes.", [".txt", ".md"], "Visual Studio Code", "VSCode.md", "Mixed", [
-      sampleItem(".txt", "Plain text", "Notepad", "txtfile", "Registry"),
-      sampleItem(".md", "Markdown", "Visual Studio Code", "VSCode.md"),
-    ]),
-    makeSampleKind("archives", "Compressed files", "Archives", "Zip, 7-Zip, and other packaged files.", [".zip", ".rar", ".7z"], "File Explorer", "CompressedFolder", "Mixed", [
-      sampleItem(".zip", "ZIP archive", "File Explorer", "CompressedFolder", "Registry"),
-      sampleItem(".rar", "RAR archive", "WinRAR", "WinRAR"),
-      sampleItem(".7z", "7-Zip archive", "7-Zip File Manager", "7-Zip.7z"),
-    ]),
-    makeSampleKind("code", "Code files", "Code", "Developer files that usually open in an editor.", [".json", ".js", ".ts", ".cs", ".py"], "Visual Studio Code", "VSCode.js", "Consistent", [
-      sampleItem(".json", "JSON file", "Visual Studio Code", "VSCode.json"),
-      sampleItem(".js", "JavaScript file", "Visual Studio Code", "VSCode.js"),
-      sampleItem(".ts", "TypeScript file", "Visual Studio Code", "VSCode.ts"),
-      sampleItem(".cs", "C# source file", "Visual Studio Code", "VSCode.cs"),
-      sampleItem(".py", "Python source file", "Visual Studio Code", "VSCode.py"),
-    ]),
-    makeSampleKind("web", "Web pages", "Web", "HTML files and pages saved from the web.", [".html", ".htm"], "Google Chrome", "ChromeHTML", "Consistent", [
-      sampleItem(".html", "HTML document", "Google Chrome", "ChromeHTML"),
-      sampleItem(".htm", "HTML document", "Google Chrome", "ChromeHTML"),
-    ]),
-  ];
-}
-
-function sampleFormatCandidates(extension) {
-  const kind = state.fileKinds.find((item) => (item.extensions || []).includes(extension));
-  const format = kind?.items?.find((item) => item.extension === extension);
-  const current = format
-    ? sampleCandidate(format.friendlyName || format.progId || t("noDefaultApp"), format.progId, "Current", true)
-    : null;
-  const candidates = [
-    current,
-    ...sampleCandidatePool(extension),
-    ...(kind?.items || []).map((item) => sampleCandidate(item.friendlyName || item.progId, item.progId, "OpenWithProgids")),
-  ].filter(Boolean);
-
-  const distinctCandidates = [];
-  const seenCandidateKeys = new Set();
-  candidates.forEach((candidate) => {
-    const key = candidateKey(candidate);
-    if (key && !seenCandidateKeys.has(key)) {
-      seenCandidateKeys.add(key);
-      distinctCandidates.push(candidate);
-    }
-  });
-
-  return {
-    extension,
-    description: format?.description || extension,
-    current,
-    candidates: distinctCandidates,
-  };
-}
-
-function sampleCandidatePool(extension) {
-  if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(extension)) {
-    return [
-      sampleCandidate("Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "RegisteredApplication"),
-      sampleCandidate("Google Chrome", "ChromeHTML", "RegisteredApplication"),
-      sampleCandidate("Visual Studio Code", "VSCode.svg", "OpenWithProgids"),
-    ];
-  }
-
-  if ([".txt", ".md", ".json", ".js", ".ts", ".cs", ".py"].includes(extension)) {
-    return [
-      sampleCandidate("Visual Studio Code", "VSCode.js", "RegisteredApplication"),
-      sampleCandidate("Notepad", "txtfile", "OpenWithList"),
-    ];
-  }
-
-  if (extension === ".pdf") {
-    return [
-      sampleCandidate("Adobe Acrobat", "AcroExch.Document", "RegisteredApplication"),
-      sampleCandidate("Microsoft Edge", "MSEdgePDF", "OpenWithProgids"),
-    ];
-  }
-
-  return [];
-}
-
-function sampleCandidate(appNameValue, progId, source, isCurrent = false) {
-  if (!appNameValue) {
-    return null;
-  }
-
-  return {
-    appName: appNameValue,
-    progId,
-    iconDataUrl: null,
-    source,
-    isCurrent,
-  };
-}
-
-function makeSampleKind(id, displayName, shortName, description, extensions, primaryAppName, primaryProgId, status, items) {
-  const primaryKey = primaryAppName || "No default app";
-  const matching = items.filter((item) => (item.friendlyName || item.progId || "No default app") === primaryKey);
-  const outliers = items
-    .filter((item) => !matching.includes(item))
-    .map((item) => ({
-      extension: item.extension,
-      description: item.description,
-      appName: item.friendlyName || item.progId || "No default app",
-      progId: item.progId,
-      source: item.source,
-    }));
-
-  return {
-    id,
-    displayName,
-    shortName,
-    description,
-    extensions,
-    primaryAppName,
-    primaryProgId,
-    primaryIconDataUrl: null,
-    matchingFormats: matching.length,
-    totalFormats: items.length,
-    status,
-    outliers,
-    items,
-  };
-}
-
-function sampleItem(extension, description, friendlyName, progId, source = "UserChoice") {
-  return {
-    extension,
-    category: "",
-    description,
-    progId,
-    friendlyName,
-    iconDataUrl: null,
-    source,
-  };
 }

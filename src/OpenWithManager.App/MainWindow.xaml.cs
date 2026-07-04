@@ -44,7 +44,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         BridgeRequest? request = null;
 
@@ -56,54 +56,58 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("Invalid bridge request.");
             }
 
-            var data = await HandleRequestAsync(request);
-            await ReplyAsync(request.Id, true, data, null);
+            var data = HandleRequest(request);
+            Reply(request.Id, true, data, null);
         }
         catch (Exception ex)
         {
-            await ReplyAsync(request?.Id, false, null, ex.Message);
+            Reply(request?.Id, false, null, ex.Message);
         }
     }
 
-    private Task<object?> HandleRequestAsync(BridgeRequest request)
+    private object? HandleRequest(BridgeRequest request)
     {
-        object? result = request.Action switch
+        switch (request.Action)
         {
-            "fileKinds:list" => _fileKinds.GetFileKinds(),
-            "associations:list" => _fileAssociations.GetKnownAssociations(),
-            "formats:candidates" => GetFormatCandidates(request.Payload),
-            "settings:openDefaultApps" => OpenDefaultApps(),
-            "settings:openExtension" => OpenExtensionSettings(request.Payload),
-            "config:export" => ExportConfig(),
-            "config:import" => ImportConfig(),
-            _ => throw new InvalidOperationException($"Unknown action: {request.Action}")
-        };
+            case "fileKinds:list":
+                return _fileKinds.GetFileKinds();
 
-        return Task.FromResult(result);
-    }
+            case "associations:list":
+                return _fileAssociations.GetKnownAssociations();
 
-    private object OpenDefaultApps()
-    {
-        _settings.OpenDefaultApps();
-        return new { opened = true };
-    }
+            case "formats:candidates":
+                var extension = request.Payload.TryGetProperty("extension", out var value)
+                    ? value.GetString()
+                    : null;
 
-    private object OpenExtensionSettings(JsonElement payload)
-    {
-        var extension = payload.TryGetProperty("extension", out var value) ? value.GetString() : null;
-        _settings.OpenDefaultApps(extension);
-        return new { opened = true };
-    }
+                if (string.IsNullOrWhiteSpace(extension))
+                {
+                    throw new InvalidOperationException("Missing extension.");
+                }
 
-    private object GetFormatCandidates(JsonElement payload)
-    {
-        var extension = payload.TryGetProperty("extension", out var value) ? value.GetString() : null;
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            throw new InvalidOperationException("Missing extension.");
+                return _formatCandidates.GetCandidates(extension);
+
+            case "settings:openDefaultApps":
+                _settings.OpenDefaultApps();
+                return new { opened = true };
+
+            case "settings:openExtension":
+                var extensionToOpen = request.Payload.TryGetProperty("extension", out var extensionValue)
+                    ? extensionValue.GetString()
+                    : null;
+
+                _settings.OpenDefaultApps(extensionToOpen);
+                return new { opened = true };
+
+            case "config:export":
+                return ExportConfig();
+
+            case "config:import":
+                return ImportConfig();
+
+            default:
+                throw new InvalidOperationException($"Unknown action: {request.Action}");
         }
-
-        return _formatCandidates.GetCandidates(extension);
     }
 
     private object ExportConfig()
@@ -145,7 +149,7 @@ public partial class MainWindow : Window
         return new { cancelled = false, path = dialog.FileName, count = imported.Count, diff };
     }
 
-    private Task ReplyAsync(string? id, bool ok, object? data, string? error)
+    private void Reply(string? id, bool ok, object? data, string? error)
     {
         var response = JsonSerializer.Serialize(new
         {
@@ -156,7 +160,6 @@ public partial class MainWindow : Window
         }, _jsonOptions);
 
         Browser.CoreWebView2.PostWebMessageAsJson(response);
-        return Task.CompletedTask;
     }
 
     private sealed record BridgeRequest(string? Id, string Action, JsonElement Payload);

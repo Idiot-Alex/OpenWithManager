@@ -103,7 +103,7 @@ public sealed class FileKindService
             .ToList();
 
         var appGroups = items
-            .GroupBy(item => AppKey(item), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(item => DisplayAppName(item), StringComparer.OrdinalIgnoreCase)
             .Select(group => new
             {
                 App = group.Key,
@@ -125,7 +125,7 @@ public sealed class FileKindService
                 : "Consistent";
 
         var outliers = items
-            .Where(item => primary is null || !string.Equals(AppKey(item), primary.App, StringComparison.OrdinalIgnoreCase))
+            .Where(item => primary is null || !string.Equals(DisplayAppName(item), primary.App, StringComparison.OrdinalIgnoreCase))
             .Select(item => new FileKindOutlier(
                 item.Extension,
                 item.Description,
@@ -148,11 +148,6 @@ public sealed class FileKindService
             status,
             outliers,
             items);
-    }
-
-    private static string AppKey(FileAssociationItem item)
-    {
-        return DisplayAppName(item);
     }
 
     private static string DisplayAppName(FileAssociationItem item)
