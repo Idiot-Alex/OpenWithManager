@@ -10,6 +10,7 @@ namespace OpenWithManager.App;
 public partial class MainWindow : Window
 {
     private readonly FileAssociationService _fileAssociations = new();
+    private readonly FileKindService _fileKinds;
     private readonly WindowsSettingsService _settings = new();
     private readonly ExportImportService _exports = new();
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -19,6 +20,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        _fileKinds = new FileKindService(_fileAssociations);
         InitializeComponent();
         Loaded += OnLoaded;
     }
@@ -65,6 +67,7 @@ public partial class MainWindow : Window
     {
         object? result = request.Action switch
         {
+            "fileKinds:list" => _fileKinds.GetFileKinds(),
             "associations:list" => _fileAssociations.GetKnownAssociations(),
             "settings:openDefaultApps" => OpenDefaultApps(),
             "settings:openExtension" => OpenExtensionSettings(request.Payload),

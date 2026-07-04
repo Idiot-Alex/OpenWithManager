@@ -1,21 +1,26 @@
 const state = {
-  associations: [],
+  fileKinds: [],
   query: "",
-  category: "All",
+  status: "All",
+  selectedId: null,
 };
 
+const statusFilters = ["All", "Mixed", "Missing", "Consistent"];
 const pending = new Map();
 const host = window.chrome?.webview;
 
 const elements = {
-  groups: document.querySelector("#fileGroups"),
+  statusFilters: document.querySelector("#statusFilters"),
+  kindList: document.querySelector("#kindList"),
+  detailPanel: document.querySelector("#detailPanel"),
   empty: document.querySelector("#emptyState"),
-  filters: document.querySelector("#categoryFilters"),
   search: document.querySelector("#searchInput"),
   toast: document.querySelector("#toast"),
   importDialog: document.querySelector("#importDialog"),
   importSummary: document.querySelector("#importSummary"),
   diffRows: document.querySelector("#diffRows"),
+  totalKinds: document.querySelector("#totalKinds"),
+  needsReview: document.querySelector("#needsReview"),
 };
 
 if (host) {
@@ -33,8 +38,8 @@ if (host) {
   });
 }
 
-document.querySelector("#refreshButton").addEventListener("click", loadAssociations);
-document.querySelector("#settingsButton").addEventListener("click", () => callHost("settings:openDefaultApps"));
+document.querySelector("#refreshButton").addEventListener("click", loadFileKinds);
+document.querySelector("#settingsButton").addEventListener("click", openDefaultSettings);
 document.querySelector("#exportButton").addEventListener("click", exportConfig);
 document.querySelector("#importButton").addEventListener("click", importConfig);
 elements.search.addEventListener("input", (event) => {
@@ -42,14 +47,21 @@ elements.search.addEventListener("input", (event) => {
   render();
 });
 
-loadAssociations();
+renderFilters();
+loadFileKinds();
 
-async function loadAssociations() {
+async function loadFileKinds() {
   try {
-    state.associations = host ? await callHost("associations:list") : sampleAssociations();
+    setLoading();
+    state.fileKinds = host ? await callHost("fileKinds:list") : sampleFileKinds();
+    if (!state.selectedId || !state.fileKinds.some((kind) => kind.id === state.selectedId)) {
+      state.selectedId = state.fileKinds[0]?.id ?? null;
+    }
     render();
   } catch (error) {
     showToast(error.message);
+    state.fileKinds = host ? [] : sampleFileKinds();
+    render();
   }
 }
 
@@ -57,7 +69,7 @@ async function exportConfig() {
   try {
     const result = await callHost("config:export");
     if (!result.cancelled) {
-      showToast(`Exported ${result.count} file types.`);
+      showToast(`Exported ${result.count} file associations.`);
     }
   } catch (error) {
     showToast(error.message);
@@ -69,7 +81,7 @@ async function importConfig() {
     const result = await callHost("config:import");
     if (result.cancelled) return;
 
-    elements.importSummary.textContent = `Compared ${result.count} imported file types from ${result.path}. This app only compares snapshots; Windows Settings still controls the default app changes.`;
+    elements.importSummary.textContent = `${result.count} imported associations compared with this PC.`;
     elements.diffRows.innerHTML = result.diff.map(renderDiff).join("");
     elements.importDialog.showModal();
   } catch (error) {
@@ -78,165 +90,190 @@ async function importConfig() {
 }
 
 function render() {
-  const groups = groupAssociations(state.associations);
-  const visible = groups.filter(matchesGroupFilters);
-  elements.groups.innerHTML = renderGroupSections(visible);
+  const visible = filteredFileKinds();
+
+  if (!visible.some((kind) => kind.id === state.selectedId)) {
+    state.selectedId = visible[0]?.id ?? state.fileKinds[0]?.id ?? null;
+  }
+
+  elements.totalKinds.textContent = state.fileKinds.length;
+  elements.needsReview.textContent = state.fileKinds.filter((kind) => kind.status !== "Consistent").length;
+  elements.kindList.innerHTML = visible.map(renderKindRow).join("");
   elements.empty.hidden = visible.length > 0;
 
-  elements.groups.querySelectorAll("[data-open-extension]").forEach((button) => {
-    button.addEventListener("click", () => callHost("settings:openExtension", { extension: button.dataset.openExtension }));
+  elements.kindList.querySelectorAll("[data-kind-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedId = button.dataset.kindId;
+      render();
+    });
   });
 
-  elements.groups.querySelectorAll("[data-open-defaults]").forEach((button) => {
-    button.addEventListener("click", () => callHost("settings:openDefaultApps"));
-  });
-
+  renderDetail();
+  renderFilters();
 }
 
-function groupAssociations(items) {
-  const byCategory = new Map();
-
-  for (const item of items) {
-    const category = item.category || "Other";
-    if (!byCategory.has(category)) {
-      byCategory.set(category, []);
-    }
-
-    byCategory.get(category).push(item);
-  }
-
-  return [...byCategory.entries()]
-    .map(([category, categoryItems]) => {
-      const sorted = categoryItems.slice().sort((a, b) => a.extension.localeCompare(b.extension));
-      const appCounts = new Map();
-
-      for (const item of sorted) {
-        const app = displayAppName(item);
-        appCounts.set(app, (appCounts.get(app) || 0) + 1);
-      }
-
-      const apps = [...appCounts.entries()].sort((a, b) => b[1] - a[1]);
-      const unknownCount = sorted.filter((item) => item.source === "Unknown" || !item.progId).length;
-      const appCount = apps.length;
-      const mainApp = apps[0]?.[0] || "No default app";
-      const mainAppIconDataUrl = sorted.find((item) => displayAppName(item) === mainApp)?.iconDataUrl || null;
-      const status = unknownCount > 0 ? "Needs default" : appCount > 1 ? "Mixed apps" : "Consistent";
-
-      return {
-        category,
-        title: categoryTitle(category),
-        description: categoryDescription(category),
-        items: sorted,
-        appCount,
-        mainApp,
-        mainAppIconDataUrl,
-        status,
-        unknownCount,
-      };
+function renderFilters() {
+  elements.statusFilters.innerHTML = statusFilters
+    .map((status) => {
+      const active = state.status === status ? " active" : "";
+      const count = status === "All"
+        ? state.fileKinds.length
+        : state.fileKinds.filter((kind) => kind.status === status).length;
+      return `
+        <button class="filter${active}" type="button" data-status="${status}">
+          <span>${escapeHtml(statusLabel(status))}</span>
+          <strong>${count}</strong>
+        </button>
+      `;
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .join("");
+
+  elements.statusFilters.querySelectorAll("[data-status]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.status = button.dataset.status;
+      render();
+    });
+  });
 }
 
-function matchesGroupFilters(group) {
-  const text = [
-    group.title,
-    group.description,
-    group.category,
-    group.mainApp,
-    group.status,
-    ...group.items.flatMap((item) => [
-      item.extension,
-      item.description,
-      item.progId,
-      item.friendlyName,
-      item.source,
-    ]),
-  ].join(" ").toLowerCase();
+function filteredFileKinds() {
+  return state.fileKinds.filter((kind) => {
+    const matchesStatus = state.status === "All" || kind.status === state.status;
+    const text = [
+      kind.displayName,
+      kind.shortName,
+      kind.description,
+      kind.primaryAppName,
+      kind.primaryProgId,
+      kind.status,
+      ...(kind.extensions || []),
+      ...(kind.items || []).flatMap((item) => [
+        item.extension,
+        item.description,
+        item.friendlyName,
+        item.progId,
+        item.source,
+      ]),
+    ].join(" ").toLowerCase();
 
-  return !state.query || text.includes(state.query);
+    return matchesStatus && (!state.query || text.includes(state.query));
+  });
 }
 
-function renderGroupSections(groups) {
-  const needsAttention = groups.filter((group) => group.status !== "Consistent");
-  const consistent = groups.filter((group) => group.status === "Consistent");
-  const sections = [];
+function renderKindRow(kind) {
+  const selected = kind.id === state.selectedId ? " selected" : "";
+  const status = statusDisplay(kind.status);
+  const app = kind.primaryAppName || "No default app";
+  const coverage = `${kind.matchingFormats} of ${kind.totalFormats} formats`;
 
-  if (needsAttention.length > 0) {
-    sections.push(renderSection("Needs attention", "These groups use mixed apps or have missing defaults.", needsAttention, true));
-  }
-
-  if (consistent.length > 0) {
-    sections.push(renderSection("Looks good", "These groups already open consistently.", consistent, false));
-  }
-
-  return sections.join("");
-}
-
-function renderSection(title, description, groups, expanded) {
   return `
-    <section class="grid gap-3">
-      <div>
-        <h2 class="text-base font-semibold text-slate-900">${escapeHtml(title)}</h2>
-        <p class="mt-1 text-sm text-slate-500">${escapeHtml(description)}</p>
+    <button class="kind-row${selected}" type="button" data-kind-id="${escapeAttribute(kind.id)}">
+      <span class="kind-icon">${escapeHtml(kind.shortName.slice(0, 2))}</span>
+      <span class="kind-main">
+        <strong>${escapeHtml(kind.displayName)}</strong>
+        <span>${escapeHtml(coverage)}</span>
+      </span>
+      <span class="kind-app">${renderAppIdentity(app, kind.primaryIconDataUrl)}</span>
+      <span class="${status.classes}">${status.label}</span>
+    </button>
+  `;
+}
+
+function renderDetail() {
+  const kind = state.fileKinds.find((item) => item.id === state.selectedId);
+  if (!kind) {
+    elements.detailPanel.innerHTML = `
+      <div class="detail-empty">
+        <h2>No file kind selected</h2>
+        <p>Pick a file kind to see its current app.</p>
       </div>
-      ${groups.map((group, index) => renderGroup(group, expanded && index === 0)).join("")}
+    `;
+    return;
+  }
+
+  const status = statusDisplay(kind.status);
+  const app = kind.primaryAppName || "No default app";
+  const outliers = kind.outliers || [];
+
+  elements.detailPanel.innerHTML = `
+    <div class="detail-head">
+      <div>
+        <p class="eyebrow">File kind</p>
+        <h2>${escapeHtml(kind.displayName)}</h2>
+      </div>
+      <span class="${status.classes}">${status.label}</span>
+    </div>
+
+    <section class="answer">
+      <p>Currently opens with</p>
+      ${renderAppIdentity(app, kind.primaryIconDataUrl, true)}
+      <span>${escapeHtml(kind.matchingFormats)} of ${escapeHtml(kind.totalFormats)} formats use this app.</span>
+    </section>
+
+    <div class="format-block">
+      <p class="section-label">Included formats</p>
+      <div class="chips">
+        ${(kind.extensions || []).map((extension) => `<span>${escapeHtml(extension.replace(".", "").toUpperCase())}</span>`).join("")}
+      </div>
+    </div>
+
+    ${outliers.length > 0 ? renderOutliers(outliers) : renderConsistentNote(kind)}
+
+    <div class="detail-actions">
+      <button class="button primary" type="button" id="changeAppButton">Change app</button>
+      <button class="button secondary" type="button" id="openSettingsButton">Open settings</button>
+    </div>
+
+    <details class="technical">
+      <summary>Technical details</summary>
+      <div class="technical-list">
+        ${(kind.items || []).map(renderTechnicalItem).join("")}
+      </div>
+    </details>
+  `;
+
+  document.querySelector("#changeAppButton").addEventListener("click", openDefaultSettings);
+  document.querySelector("#openSettingsButton").addEventListener("click", openDefaultSettings);
+}
+
+async function openDefaultSettings() {
+  try {
+    await callHost("settings:openDefaultApps");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function renderOutliers(outliers) {
+  return `
+    <section class="outliers">
+      <p class="section-label">Exceptions</p>
+      ${outliers.map((item) => `
+        <div class="outlier">
+          <strong>${escapeHtml(item.extension.toUpperCase())}</strong>
+          <span>${escapeHtml(item.appName || "No default app")}</span>
+        </div>
+      `).join("")}
     </section>
   `;
 }
 
-function renderGroup(group, expanded) {
-  const status = groupStatusDisplay(group);
-  const mainApp = renderAppIdentity(group.mainApp, group.mainAppIconDataUrl, "h-6 w-6", "text-xs");
-  const appsLine =
-    group.appCount === 1
-      ? `All ${group.items.length} file types open with`
-      : `${group.items.length} file types use ${group.appCount} different apps.`;
-
+function renderConsistentNote(kind) {
   return `
-    <article class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div class="flex flex-col justify-between gap-4 px-5 py-4 lg:flex-row lg:items-center">
-        <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <h3 class="text-lg font-semibold text-slate-900">${escapeHtml(group.title)}</h3>
-            <span class="${status.classes}">${status.label}</span>
-          </div>
-          <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span>${escapeHtml(appsLine)}</span>
-            ${group.appCount === 1 ? mainApp : ""}
-          </div>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
-          <button class="btn-secondary" data-open-defaults>Open settings</button>
-        </div>
-      </div>
-      <details ${expanded ? "open" : ""} class="border-t border-slate-100">
-        <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-slate-600">File type details</summary>
-        <div class="divide-y divide-slate-100">
-          ${group.items.map(renderFileType).join("")}
-        </div>
-      </details>
-    </article>
+    <section class="note">
+      <strong>${escapeHtml(kind.shortName)} are consistent.</strong>
+      <span>Every tracked format in this group opens with the same app.</span>
+    </section>
   `;
 }
 
-function renderFileType(item) {
-  const name = displayAppName(item);
-  const source = sourceDisplay(item.source);
-
+function renderTechnicalItem(item) {
   return `
-    <div class="grid gap-3 px-5 py-3 transition hover:bg-slate-50 md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_150px] md:items-center">
-      <div class="flex items-center gap-3">
-        <span class="grid h-9 min-w-14 place-items-center rounded-md bg-slate-100 px-2 font-mono text-sm font-semibold text-blue-700">${escapeHtml(item.extension)}</span>
-        <div>
-          <div class="font-medium text-slate-900">${escapeHtml(item.description)}</div>
-          <div class="text-xs text-slate-500">${escapeHtml(item.category)}</div>
-        </div>
-      </div>
-      ${renderAppIdentity(name, item.iconDataUrl, "h-8 w-8", "text-sm")}
-      <div class="flex items-center justify-between gap-2 md:justify-end">
-        <span class="${source.classes}">${source.label}</span>
-        <button class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50" data-open-extension="${escapeHtml(item.extension)}">Change</button>
-      </div>
+    <div class="technical-row">
+      <strong>${escapeHtml(item.extension)}</strong>
+      <span>${escapeHtml(item.friendlyName || item.progId || "No default app")}</span>
+      <code>${escapeHtml(item.progId || "none")}</code>
+      <em>${escapeHtml(sourceLabel(item.source))}</em>
     </div>
   `;
 }
@@ -245,124 +282,27 @@ function renderDiff(item) {
   const status = diffStatusDisplay(item.status);
 
   return `
-    <div class="grid grid-cols-[90px_1fr_130px] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-      <strong class="font-mono text-sm text-blue-700">${escapeHtml(item.extension)}</strong>
+    <div class="diff-row">
+      <strong>${escapeHtml(item.extension)}</strong>
       <div>
-        <div class="text-sm text-slate-500">Current: ${escapeHtml(item.currentProgId || "none")}</div>
-        <div class="text-sm text-slate-500">Imported: ${escapeHtml(item.importedProgId || "none")}</div>
+        <span>Current: ${escapeHtml(item.currentProgId || "none")}</span>
+        <span>Snapshot: ${escapeHtml(item.importedProgId || "none")}</span>
       </div>
       <span class="${status.classes}">${status.label}</span>
     </div>
   `;
 }
 
-function displayAppName(item) {
-  return item.friendlyName || item.progId || "No default app";
-}
-
-function renderAppIdentity(name, iconDataUrl, sizeClass, textClass) {
-  const safeName = escapeHtml(name);
-  const icon = iconDataUrl
-    ? `<img class="${sizeClass} rounded-md object-contain" src="${escapeAttribute(iconDataUrl)}" alt="" />`
-    : `<span class="${sizeClass} grid place-items-center rounded-md bg-slate-100 font-semibold text-slate-500">${escapeHtml(appInitial(name))}</span>`;
-
-  return `
-    <div class="flex min-w-0 items-center gap-2">
-      ${icon}
-      <span class="truncate font-medium text-slate-900 ${textClass}">${safeName}</span>
+function setLoading() {
+  elements.kindList.innerHTML = Array.from({ length: 7 }, (_, index) => `
+    <div class="skeleton-row" style="--delay: ${index * 60}ms"></div>
+  `).join("");
+  elements.detailPanel.innerHTML = `
+    <div class="detail-empty">
+      <h2>Reading defaults</h2>
+      <p>Checking the apps Windows uses for your files.</p>
     </div>
   `;
-}
-
-function appInitial(name) {
-  return (name || "?").trim().charAt(0).toUpperCase() || "?";
-}
-
-function categoryTitle(category) {
-  return {
-    Archive: "Compressed files",
-    Audio: "Music and audio",
-    Code: "Code and scripts",
-    Document: "Documents",
-    Image: "Photos and images",
-    Video: "Videos",
-    Web: "Web pages",
-  }[category] || category;
-}
-
-function categoryDescription(category) {
-  return {
-    Archive: "Zip, 7-Zip, and other packaged files.",
-    Audio: "Songs, recordings, and sound files.",
-    Code: "Developer files that usually open in an editor.",
-    Document: "Office, PDF, text, and writing files.",
-    Image: "Pictures, screenshots, and image formats.",
-    Video: "Movies, clips, and screen recordings.",
-    Web: "HTML files and pages saved from the web.",
-  }[category] || "Related file types on this PC.";
-}
-
-function groupStatusDisplay(group) {
-  if (group.status === "Needs default") {
-    return {
-      label: `${group.unknownCount} missing default`,
-      classes: "inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700",
-    };
-  }
-
-  if (group.status === "Mixed apps") {
-    return {
-      label: "Uses multiple apps",
-      classes: "inline-flex rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700",
-    };
-  }
-
-  return {
-    label: "Consistent",
-    classes: "inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700",
-  };
-}
-
-function sourceDisplay(source) {
-  if (source === "UserChoice") {
-    return {
-      label: "Set by you",
-      classes: "inline-flex rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700",
-    };
-  }
-
-  if (source === "Unknown") {
-    return {
-      label: "Not found",
-      classes: "inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700",
-    };
-  }
-
-  return {
-    label: "System default",
-    classes: "inline-flex rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600",
-  };
-}
-
-function diffStatusDisplay(status) {
-  if (status === "Different") {
-    return {
-      label: "Changed",
-      classes: "inline-flex justify-center rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700",
-    };
-  }
-
-  if (status === "Missing locally") {
-    return {
-      label: "Missing here",
-      classes: "inline-flex justify-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600",
-    };
-  }
-
-  return {
-    label: "Same",
-    classes: "inline-flex justify-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700",
-  };
 }
 
 function callHost(action, payload = {}) {
@@ -378,19 +318,64 @@ function callHost(action, payload = {}) {
   });
 }
 
-function sampleAssociations() {
-  return [
-    { extension: ".pdf", category: "Document", description: "PDF document", progId: "AcroExch.Document", friendlyName: "Adobe Acrobat", source: "UserChoice" },
-    { extension: ".docx", category: "Document", description: "Word document", progId: "Word.Document.12", friendlyName: "Microsoft Word", source: "UserChoice" },
-    { extension: ".txt", category: "Document", description: "Plain text", progId: "txtfile", friendlyName: "Notepad", source: "Registry" },
-    { extension: ".jpg", category: "Image", description: "JPEG image", progId: "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", friendlyName: "Photos", source: "UserChoice" },
-    { extension: ".png", category: "Image", description: "PNG image", progId: "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", friendlyName: "Photos", source: "UserChoice" },
-    { extension: ".webp", category: "Image", description: "WebP image", progId: "ChromeHTML", friendlyName: "Google Chrome", source: "UserChoice" },
-    { extension: ".mp4", category: "Video", description: "MP4 video", progId: "VLC.mp4", friendlyName: "VLC media player", source: "UserChoice" },
-    { extension: ".mkv", category: "Video", description: "Matroska video", progId: null, friendlyName: null, source: "Unknown" },
-    { extension: ".js", category: "Code", description: "JavaScript file", progId: "VSCode.js", friendlyName: "Visual Studio Code", source: "UserChoice" },
-    { extension: ".cs", category: "Code", description: "C# source file", progId: "VSCode.cs", friendlyName: "Visual Studio Code", source: "UserChoice" },
-  ];
+function renderAppIdentity(name, iconDataUrl, large = false) {
+  const initial = appInitial(name);
+  const size = large ? " app-large" : "";
+  const icon = iconDataUrl
+    ? `<img src="${escapeAttribute(iconDataUrl)}" alt="" />`
+    : `<span>${escapeHtml(initial)}</span>`;
+
+  return `
+    <span class="app-identity${size}">
+      ${icon}
+      <strong>${escapeHtml(name)}</strong>
+    </span>
+  `;
+}
+
+function statusDisplay(status) {
+  if (status === "Mixed") {
+    return { label: "Mixed", classes: "status mixed" };
+  }
+
+  if (status === "Missing") {
+    return { label: "Missing", classes: "status missing" };
+  }
+
+  return { label: "Consistent", classes: "status consistent" };
+}
+
+function diffStatusDisplay(status) {
+  if (status === "Different") {
+    return { label: "Changed", classes: "status mixed" };
+  }
+
+  if (status === "Missing locally") {
+    return { label: "Missing here", classes: "status missing" };
+  }
+
+  return { label: "Same", classes: "status consistent" };
+}
+
+function statusLabel(status) {
+  return {
+    All: "All",
+    Mixed: "Needs review",
+    Missing: "No default",
+    Consistent: "Consistent",
+  }[status] || status;
+}
+
+function sourceLabel(source) {
+  return {
+    UserChoice: "Set by you",
+    Registry: "System default",
+    Unknown: "Not found",
+  }[source] || source;
+}
+
+function appInitial(name) {
+  return (name || "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 function showToast(message) {
@@ -413,4 +398,92 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
+function sampleFileKinds() {
+  return [
+    makeSampleKind("images", "Photos and images", "Images", "Pictures, screenshots, and image assets.", [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"], "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "Mixed", [
+      sampleItem(".jpg", "JPEG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
+      sampleItem(".jpeg", "JPEG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
+      sampleItem(".png", "PNG image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
+      sampleItem(".gif", "GIF image", "Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc"),
+      sampleItem(".webp", "WebP image", "Google Chrome", "ChromeHTML"),
+      sampleItem(".svg", "SVG image", "Visual Studio Code", "VSCode.svg"),
+    ]),
+    makeSampleKind("videos", "Videos", "Videos", "Movies, clips, and screen recordings.", [".mp4", ".mov", ".mkv"], "VLC media player", "VLC.mp4", "Consistent", [
+      sampleItem(".mp4", "MP4 video", "VLC media player", "VLC.mp4"),
+      sampleItem(".mov", "QuickTime video", "VLC media player", "VLC.mov"),
+      sampleItem(".mkv", "Matroska video", "VLC media player", "VLC.mkv"),
+    ]),
+    makeSampleKind("music", "Music and audio", "Audio", "Songs, recordings, and sound files.", [".mp3", ".wav"], "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs", "Consistent", [
+      sampleItem(".mp3", "MP3 audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
+      sampleItem(".wav", "WAV audio", "Groove Music", "AppXqj98qxeaynz6dv4459ayz6bnqxbyaqcs"),
+    ]),
+    makeSampleKind("documents", "Documents", "Docs", "Office, PDF, text, and writing files.", [".pdf", ".txt", ".md", ".docx", ".xlsx", ".pptx"], "Microsoft Word", "Word.Document.12", "Mixed", [
+      sampleItem(".pdf", "PDF document", "Adobe Acrobat", "AcroExch.Document"),
+      sampleItem(".txt", "Plain text", "Notepad", "txtfile", "Registry"),
+      sampleItem(".md", "Markdown", "Visual Studio Code", "VSCode.md"),
+      sampleItem(".docx", "Word document", "Microsoft Word", "Word.Document.12"),
+      sampleItem(".xlsx", "Excel workbook", "Microsoft Excel", "Excel.Sheet.12"),
+      sampleItem(".pptx", "PowerPoint presentation", "Microsoft PowerPoint", "PowerPoint.Show.12"),
+    ]),
+    makeSampleKind("archives", "Compressed files", "Archives", "Zip, 7-Zip, and other packaged files.", [".zip", ".rar", ".7z"], "File Explorer", "CompressedFolder", "Mixed", [
+      sampleItem(".zip", "ZIP archive", "File Explorer", "CompressedFolder", "Registry"),
+      sampleItem(".rar", "RAR archive", "WinRAR", "WinRAR"),
+      sampleItem(".7z", "7-Zip archive", "7-Zip File Manager", "7-Zip.7z"),
+    ]),
+    makeSampleKind("code", "Code files", "Code", "Developer files that usually open in an editor.", [".json", ".js", ".ts", ".cs", ".py"], "Visual Studio Code", "VSCode.js", "Consistent", [
+      sampleItem(".json", "JSON file", "Visual Studio Code", "VSCode.json"),
+      sampleItem(".js", "JavaScript file", "Visual Studio Code", "VSCode.js"),
+      sampleItem(".ts", "TypeScript file", "Visual Studio Code", "VSCode.ts"),
+      sampleItem(".cs", "C# source file", "Visual Studio Code", "VSCode.cs"),
+      sampleItem(".py", "Python source file", "Visual Studio Code", "VSCode.py"),
+    ]),
+    makeSampleKind("web", "Web pages", "Web", "HTML files and pages saved from the web.", [".html", ".htm"], "Google Chrome", "ChromeHTML", "Consistent", [
+      sampleItem(".html", "HTML document", "Google Chrome", "ChromeHTML"),
+      sampleItem(".htm", "HTML document", "Google Chrome", "ChromeHTML"),
+    ]),
+  ];
+}
+
+function makeSampleKind(id, displayName, shortName, description, extensions, primaryAppName, primaryProgId, status, items) {
+  const primaryKey = primaryAppName || "No default app";
+  const matching = items.filter((item) => (item.friendlyName || item.progId || "No default app") === primaryKey);
+  const outliers = items
+    .filter((item) => !matching.includes(item))
+    .map((item) => ({
+      extension: item.extension,
+      description: item.description,
+      appName: item.friendlyName || item.progId || "No default app",
+      progId: item.progId,
+      source: item.source,
+    }));
+
+  return {
+    id,
+    displayName,
+    shortName,
+    description,
+    extensions,
+    primaryAppName,
+    primaryProgId,
+    primaryIconDataUrl: null,
+    matchingFormats: matching.length,
+    totalFormats: items.length,
+    status,
+    outliers,
+    items,
+  };
+}
+
+function sampleItem(extension, description, friendlyName, progId, source = "UserChoice") {
+  return {
+    extension,
+    category: "",
+    description,
+    progId,
+    friendlyName,
+    iconDataUrl: null,
+    source,
+  };
 }
