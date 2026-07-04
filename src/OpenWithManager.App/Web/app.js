@@ -80,7 +80,14 @@ async function importConfig() {
 function render() {
   const categories = ["All", ...new Set(state.associations.map((item) => item.category))];
   elements.filters.innerHTML = categories
-    .map((category) => `<button class="filter" aria-pressed="${category === state.category}" data-category="${category}">${category}</button>`)
+    .map((category) => {
+      const active = category === state.category;
+      const classes = active
+        ? "rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700"
+        : "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50";
+
+      return `<button class="${classes}" aria-pressed="${active}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`;
+    })
     .join("");
 
   elements.filters.querySelectorAll("button").forEach((button) => {
@@ -120,29 +127,88 @@ function matchesFilters(item) {
 function renderRow(item) {
   const name = escapeHtml(item.friendlyName || "Unknown application");
   const progId = escapeHtml(item.progId || "No ProgID found");
+  const source = sourceDisplay(item.source);
 
   return `
-    <tr>
-      <td><span class="extension">${escapeHtml(item.extension)}</span><div class="muted">${escapeHtml(item.description)}</div></td>
-      <td>${escapeHtml(item.category)}</td>
-      <td><strong>${name}</strong><div class="muted">${progId}</div></td>
-      <td><span class="source ${escapeHtml(item.source)}">${escapeHtml(item.source)}</span></td>
-      <td><button class="rowAction" data-open-extension="${escapeHtml(item.extension)}">Open settings</button></td>
+    <tr class="transition hover:bg-slate-50">
+      <td class="px-5 py-4 align-middle">
+        <div class="flex items-center gap-3">
+          <span class="grid h-10 min-w-14 place-items-center rounded-md bg-slate-100 px-2 font-mono text-sm font-semibold text-blue-700">${escapeHtml(item.extension)}</span>
+          <div>
+            <div class="font-medium text-slate-900">${escapeHtml(item.description)}</div>
+            <div class="text-sm text-slate-500">${escapeHtml(item.category)}</div>
+          </div>
+        </div>
+      </td>
+      <td class="px-5 py-4 align-middle">
+        <div class="font-medium text-slate-900">${name}</div>
+        <div class="mt-0.5 font-mono text-xs text-slate-500">${progId}</div>
+      </td>
+      <td class="px-5 py-4 align-middle">
+        <span class="${source.classes}">${source.label}</span>
+      </td>
+      <td class="px-5 py-4 text-right align-middle">
+        <button class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50" data-open-extension="${escapeHtml(item.extension)}">Open settings</button>
+      </td>
     </tr>
   `;
 }
 
 function renderDiff(item) {
+  const status = diffStatusDisplay(item.status);
+
   return `
-    <div class="diffItem">
-      <strong>${escapeHtml(item.extension)}</strong>
+    <div class="grid grid-cols-[90px_1fr_130px] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+      <strong class="font-mono text-sm text-blue-700">${escapeHtml(item.extension)}</strong>
       <div>
-        <div class="muted">Current: ${escapeHtml(item.currentProgId || "none")}</div>
-        <div class="muted">Imported: ${escapeHtml(item.importedProgId || "none")}</div>
+        <div class="text-sm text-slate-500">Current: ${escapeHtml(item.currentProgId || "none")}</div>
+        <div class="text-sm text-slate-500">Imported: ${escapeHtml(item.importedProgId || "none")}</div>
       </div>
-      <span class="source ${item.status === "Different" ? "Unknown" : ""}">${escapeHtml(item.status)}</span>
+      <span class="${status.classes}">${status.label}</span>
     </div>
   `;
+}
+
+function sourceDisplay(source) {
+  if (source === "UserChoice") {
+    return {
+      label: "Set by you",
+      classes: "inline-flex rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700",
+    };
+  }
+
+  if (source === "Unknown") {
+    return {
+      label: "Not found",
+      classes: "inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700",
+    };
+  }
+
+  return {
+    label: "System default",
+    classes: "inline-flex rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600",
+  };
+}
+
+function diffStatusDisplay(status) {
+  if (status === "Different") {
+    return {
+      label: "Changed",
+      classes: "inline-flex justify-center rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700",
+    };
+  }
+
+  if (status === "Missing locally") {
+    return {
+      label: "Missing here",
+      classes: "inline-flex justify-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600",
+    };
+  }
+
+  return {
+    label: "Same",
+    classes: "inline-flex justify-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700",
+  };
 }
 
 function callHost(action, payload = {}) {
