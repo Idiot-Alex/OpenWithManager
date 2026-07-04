@@ -17,12 +17,17 @@ const elements = {
   appTagline: document.querySelector("#appTagline"),
   searchLabel: document.querySelector(".search .sr-only"),
   actions: document.querySelector("#actions"),
+  languageButton: document.querySelector("#languageButton"),
   languageLabel: document.querySelector("#languageLabel"),
-  languageSelect: document.querySelector("#languageSelect"),
+  languageCurrent: document.querySelector("#languageCurrent"),
   refreshButton: document.querySelector("#refreshButton"),
+  refreshButtonLabel: document.querySelector("#refreshButton .button-label"),
   exportButton: document.querySelector("#exportButton"),
+  exportButtonLabel: document.querySelector("#exportButton .button-label"),
   importButton: document.querySelector("#importButton"),
+  importButtonLabel: document.querySelector("#importButton .button-label"),
   settingsButton: document.querySelector("#settingsButton"),
+  settingsButtonLabel: document.querySelector("#settingsButton .button-label"),
   kindListSection: document.querySelector("#kindListSection"),
   fileKindsLabel: document.querySelector("#fileKindsLabel"),
   statusFilters: document.querySelector("#statusFilters"),
@@ -57,8 +62,9 @@ document.querySelector("#refreshButton").addEventListener("click", loadFileKinds
 document.querySelector("#settingsButton").addEventListener("click", openDefaultSettings);
 document.querySelector("#exportButton").addEventListener("click", exportConfig);
 document.querySelector("#importButton").addEventListener("click", importConfig);
-elements.languageSelect.addEventListener("change", (event) => {
-  i18n.setLanguage(event.target.value);
+elements.languageButton.addEventListener("click", () => {
+  const nextLanguage = i18n.getLanguage() === "zh-Hans" ? "en" : "zh-Hans";
+  i18n.setLanguage(nextLanguage);
   render();
 });
 elements.search.addEventListener("input", (event) => {
@@ -141,10 +147,11 @@ function renderStaticText() {
   setText(elements.appTagline, t("appTagline"));
   setText(elements.searchLabel, t("searchLabel"));
   setText(elements.languageLabel, t("language"));
-  setText(elements.refreshButton, t("refresh"));
-  setText(elements.exportButton, t("export"));
-  setText(elements.importButton, t("compare"));
-  setText(elements.settingsButton, t("openSettings"));
+  setText(elements.languageCurrent, language === "zh-Hans" ? "中" : "EN");
+  setText(elements.refreshButtonLabel, t("refresh"));
+  setText(elements.exportButtonLabel, t("export"));
+  setText(elements.importButtonLabel, t("compare"));
+  setText(elements.settingsButtonLabel, t("openSettings"));
   setText(elements.fileKindsLabel, t("fileKinds"));
   setText(elements.empty, t("emptyNoMatch"));
   setText(elements.dialogTitle, t("snapshotComparison"));
@@ -152,14 +159,16 @@ function renderStaticText() {
 
   elements.search.placeholder = t("searchPlaceholder");
   elements.actions.setAttribute("aria-label", t("actionsLabel"));
-  elements.languageSelect.setAttribute("aria-label", t("language"));
+  setButtonLabel(elements.languageButton, `${t("language")}: ${language === "zh-Hans" ? "中文" : "English"}`);
+  setButtonLabel(elements.refreshButton, t("refresh"));
+  setButtonLabel(elements.exportButton, t("export"));
+  setButtonLabel(elements.importButton, t("compare"));
+  setButtonLabel(elements.settingsButton, t("openSettings"));
   elements.kindListSection.setAttribute("aria-label", t("fileKinds"));
   elements.statusFilters.setAttribute("aria-label", t("filterFileKinds"));
   elements.detailPanel.setAttribute("aria-label", t("selectedFileKind"));
 
-  if (elements.languageSelect.value !== language) {
-    elements.languageSelect.value = language;
-  }
+  refreshIcons();
 }
 
 function renderFilters() {
@@ -225,7 +234,7 @@ function renderKindRow(kind) {
         <strong>${escapeHtml(kindTitle(kind))}</strong>
       </span>
       <span class="kind-app">${renderAppIdentity(app, kind.primaryIconDataUrl)}</span>
-      <span class="${status.classes}">${escapeHtml(status.label)}</span>
+      ${renderStatus(status, true)}
     </button>
   `;
 }
@@ -252,11 +261,11 @@ function renderDetail() {
         <p class="eyebrow">${escapeHtml(t("fileKind"))}</p>
         <h2>${escapeHtml(kindTitle(kind))}</h2>
       </div>
-      <span class="${status.classes}">${escapeHtml(status.label)}</span>
+      ${renderStatus(status)}
     </div>
 
     <section class="answer">
-      <p>${escapeHtml(openingText(kind))}</p>
+      <p>${escapeHtml(answerLabel(kind))}</p>
       ${renderAppIdentity(app, kind.primaryIconDataUrl, true)}
     </section>
 
@@ -270,8 +279,14 @@ function renderDetail() {
     ${outliers.length > 0 ? renderOutliers(outliers) : ""}
 
     <div class="detail-actions">
-      <button class="button primary" type="button" id="changeAppButton">${escapeHtml(t("chooseApp"))}</button>
-      <button class="button secondary" type="button" id="openSettingsButton">${escapeHtml(t("openDefaultApps"))}</button>
+      <button class="button primary" type="button" id="changeAppButton">
+        ${icon("mouse-pointer-click")}
+        <span>${escapeHtml(t("chooseApp"))}</span>
+      </button>
+      <button class="button secondary" type="button" id="openSettingsButton">
+        ${icon("external-link")}
+        <span>${escapeHtml(t("openDefaultApps"))}</span>
+      </button>
     </div>
     <p class="settings-hint">${escapeHtml(t("settingsHint"))}</p>
 
@@ -285,6 +300,7 @@ function renderDetail() {
 
   document.querySelector("#changeAppButton").addEventListener("click", openDefaultSettings);
   document.querySelector("#openSettingsButton").addEventListener("click", openDefaultSettings);
+  refreshIcons();
 }
 
 async function openDefaultSettings() {
@@ -313,14 +329,12 @@ function needsReview(kind) {
   return kind.status !== "Consistent";
 }
 
-function openingText(kind) {
+function answerLabel(kind) {
   if (kind.status === "Missing") {
     return t("noDefaultAppReported");
   }
 
-  return kind.status === "Mixed"
-    ? t("mostlyOpenWith", { name: kindTitle(kind) })
-    : t("openWith", { name: kindTitle(kind) });
+  return t("currentApp");
 }
 
 function exceptionLabel(kind) {
@@ -357,7 +371,7 @@ function renderDiff(item) {
         <span>${escapeHtml(t("current"))}: ${escapeHtml(item.currentProgId || t("none"))}</span>
         <span>${escapeHtml(t("snapshot"))}: ${escapeHtml(item.importedProgId || t("none"))}</span>
       </div>
-      <span class="${status.classes}">${escapeHtml(status.label)}</span>
+      ${renderStatus(status)}
     </div>
   `;
 }
@@ -402,16 +416,28 @@ function renderAppIdentity(name, iconDataUrl, large = false) {
   `;
 }
 
+function renderStatus(status, compact = false) {
+  if (compact && status.variant === "consistent") {
+    return `
+      <span class="${status.classes} status-icon" aria-label="${escapeAttribute(status.label)}" title="${escapeAttribute(status.label)}">
+        ${icon("check")}
+      </span>
+    `;
+  }
+
+  return `<span class="${status.classes}">${escapeHtml(status.label)}</span>`;
+}
+
 function statusDisplay(kind) {
   if (kind.status === "Mixed") {
-    return { label: exceptionLabel(kind), classes: "status mixed" };
+    return { label: exceptionLabel(kind), classes: "status mixed", variant: "mixed" };
   }
 
   if (kind.status === "Missing") {
-    return { label: t("noAppSet"), classes: "status missing" };
+    return { label: t("noAppSet"), classes: "status missing", variant: "missing" };
   }
 
-  return { label: t("allSet"), classes: "status consistent" };
+  return { label: t("allSet"), classes: "status consistent", variant: "consistent" };
 }
 
 function diffStatusDisplay(status) {
@@ -465,6 +491,23 @@ function setText(element, value) {
   if (element) {
     element.textContent = value;
   }
+}
+
+function setButtonLabel(button, label) {
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
+function icon(name) {
+  return `<i data-lucide="${escapeAttribute(name)}" aria-hidden="true"></i>`;
+}
+
+function refreshIcons() {
+  window.lucide?.createIcons({
+    attrs: {
+      "stroke-width": 1.8,
+    },
+  });
 }
 
 function showToast(message) {

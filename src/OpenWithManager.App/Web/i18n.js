@@ -4,7 +4,7 @@
   const messages = {
     en: {
       appTitle: "OpenWith Manager",
-      appTagline: "Choose what should open each kind of file.",
+      appTagline: "Choose apps for file kinds.",
       searchLabel: "Search files or apps",
       searchPlaceholder: "Search files or apps",
       actionsLabel: "Actions",
@@ -22,6 +22,7 @@
       noFileKindSelected: "No file kind selected",
       pickFileKind: "Pick a file kind to see its current app.",
       fileKind: "File kind",
+      currentApp: "Current app",
       includedFormats: "Included formats",
       exceptions: "Exceptions",
       chooseApp: "Choose app",
@@ -90,7 +91,7 @@
     },
     "zh-Hans": {
       appTitle: "OpenWith Manager",
-      appTagline: "按文件类型选择应该由哪个应用打开。",
+      appTagline: "按文件类型选择打开应用。",
       searchLabel: "搜索文件或应用",
       searchPlaceholder: "搜索文件或应用",
       actionsLabel: "操作",
@@ -108,6 +109,7 @@
       noFileKindSelected: "未选择文件类型",
       pickFileKind: "选择一种文件类型，查看当前打开应用。",
       fileKind: "文件类型",
+      currentApp: "当前使用",
       includedFormats: "包含格式",
       exceptions: "例外",
       chooseApp: "选择应用",

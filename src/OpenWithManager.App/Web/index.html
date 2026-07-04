@@ -21,21 +21,32 @@
 
         <label class="search">
           <span class="sr-only">Search files or apps</span>
+          <i data-lucide="search" aria-hidden="true"></i>
           <input id="searchInput" type="search" placeholder="Search files or apps" autocomplete="off" />
         </label>
 
         <div id="actions" class="actions" aria-label="Actions">
-          <label class="language-picker">
+          <button id="languageButton" class="button secondary icon-button language-button" type="button">
+            <i data-lucide="languages" aria-hidden="true"></i>
             <span id="languageLabel" class="sr-only">Language</span>
-            <select id="languageSelect" aria-label="Language">
-              <option value="en">English</option>
-              <option value="zh-Hans">中文</option>
-            </select>
-          </label>
-          <button id="refreshButton" class="button secondary" type="button">Refresh</button>
-          <button id="exportButton" class="button secondary" type="button">Export</button>
-          <button id="importButton" class="button secondary" type="button">Compare</button>
-          <button id="settingsButton" class="button primary" type="button">Open settings</button>
+            <span id="languageCurrent" aria-hidden="true">EN</span>
+          </button>
+          <button id="refreshButton" class="button secondary icon-button" type="button">
+            <i data-lucide="refresh-cw" aria-hidden="true"></i>
+            <span class="button-label sr-only">Refresh</span>
+          </button>
+          <button id="exportButton" class="button secondary icon-button" type="button">
+            <i data-lucide="download" aria-hidden="true"></i>
+            <span class="button-label sr-only">Export</span>
+          </button>
+          <button id="importButton" class="button secondary icon-button" type="button">
+            <i data-lucide="git-compare-arrows" aria-hidden="true"></i>
+            <span class="button-label sr-only">Compare</span>
+          </button>
+          <button id="settingsButton" class="button primary" type="button">
+            <i data-lucide="settings" aria-hidden="true"></i>
+            <span class="button-label">Open settings</span>
+          </button>
         </div>
       </header>
 
@@ -69,6 +80,7 @@
     </dialog>
 
     <div id="toast" class="toast" hidden></div>
+    <script src="./vendor/lucide-1.23.0.min.js"></script>
     <script src="./i18n.js"></script>
     <script src="./app.js"></script>
   </body>
