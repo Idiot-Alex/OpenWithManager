@@ -12,9 +12,6 @@ const elements = {
   empty: document.querySelector("#emptyState"),
   filters: document.querySelector("#categoryFilters"),
   search: document.querySelector("#searchInput"),
-  totalCount: document.querySelector("#totalCount"),
-  userChoiceCount: document.querySelector("#userChoiceCount"),
-  unknownCount: document.querySelector("#unknownCount"),
   toast: document.querySelector("#toast"),
   importDialog: document.querySelector("#importDialog"),
   importSummary: document.querySelector("#importSummary"),
@@ -82,28 +79,8 @@ async function importConfig() {
 
 function render() {
   const groups = groupAssociations(state.associations);
-  const filterOptions = ["All", "Needs attention", ...groups.map((group) => group.category)];
-
-  elements.filters.innerHTML = filterOptions
-    .map((filter) => {
-      const active = filter === state.category;
-      const classes = active
-        ? "rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700"
-        : "rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50";
-
-      return `<button class="${classes}" aria-pressed="${active}" data-category="${escapeHtml(filter)}">${escapeHtml(filter)}</button>`;
-    })
-    .join("");
-
-  elements.filters.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.category = button.dataset.category;
-      render();
-    });
-  });
-
   const visible = groups.filter(matchesGroupFilters);
-  elements.groups.innerHTML = visible.map(renderGroup).join("");
+  elements.groups.innerHTML = renderGroupSections(visible);
   elements.empty.hidden = visible.length > 0;
 
   elements.groups.querySelectorAll("[data-open-extension]").forEach((button) => {
@@ -114,9 +91,6 @@ function render() {
     button.addEventListener("click", () => callHost("settings:openDefaultApps"));
   });
 
-  elements.totalCount.textContent = groups.length;
-  elements.userChoiceCount.textContent = groups.filter((group) => group.status === "Consistent").length;
-  elements.unknownCount.textContent = groups.filter((group) => group.status !== "Consistent").length;
 }
 
 function groupAssociations(items) {
@@ -162,11 +136,6 @@ function groupAssociations(items) {
 }
 
 function matchesGroupFilters(group) {
-  const inCategory =
-    state.category === "All" ||
-    group.category === state.category ||
-    (state.category === "Needs attention" && group.status !== "Consistent");
-
   const text = [
     group.title,
     group.description,
@@ -182,10 +151,38 @@ function matchesGroupFilters(group) {
     ]),
   ].join(" ").toLowerCase();
 
-  return inCategory && (!state.query || text.includes(state.query));
+  return !state.query || text.includes(state.query);
 }
 
-function renderGroup(group) {
+function renderGroupSections(groups) {
+  const needsAttention = groups.filter((group) => group.status !== "Consistent");
+  const consistent = groups.filter((group) => group.status === "Consistent");
+  const sections = [];
+
+  if (needsAttention.length > 0) {
+    sections.push(renderSection("Needs attention", "These groups use mixed apps or have missing defaults.", needsAttention, true));
+  }
+
+  if (consistent.length > 0) {
+    sections.push(renderSection("Looks good", "These groups already open consistently.", consistent, false));
+  }
+
+  return sections.join("");
+}
+
+function renderSection(title, description, groups, expanded) {
+  return `
+    <section class="grid gap-3">
+      <div>
+        <h2 class="text-base font-semibold text-slate-900">${escapeHtml(title)}</h2>
+        <p class="mt-1 text-sm text-slate-500">${escapeHtml(description)}</p>
+      </div>
+      ${groups.map((group, index) => renderGroup(group, expanded && index === 0)).join("")}
+    </section>
+  `;
+}
+
+function renderGroup(group, expanded) {
   const status = groupStatusDisplay(group);
   const appsLine =
     group.appCount === 1
@@ -194,20 +191,24 @@ function renderGroup(group) {
 
   return `
     <article class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div class="flex flex-col justify-between gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-start">
+      <div class="flex flex-col justify-between gap-4 px-5 py-4 lg:flex-row lg:items-center">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <h2 class="text-lg font-semibold text-slate-900">${escapeHtml(group.title)}</h2>
+            <h3 class="text-lg font-semibold text-slate-900">${escapeHtml(group.title)}</h3>
             <span class="${status.classes}">${status.label}</span>
           </div>
-          <p class="mt-1 text-sm text-slate-500">${escapeHtml(group.description)}</p>
-          <p class="mt-2 text-sm font-medium text-slate-700">${escapeHtml(appsLine)}</p>
+          <p class="mt-1 text-sm text-slate-500">${escapeHtml(appsLine)}</p>
         </div>
-        <button class="btn-secondary shrink-0" data-open-defaults>Open Windows settings</button>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <button class="btn-secondary" data-open-defaults>Open settings</button>
+        </div>
       </div>
-      <div class="divide-y divide-slate-100">
-        ${group.items.map(renderFileType).join("")}
-      </div>
+      <details ${expanded ? "open" : ""} class="border-t border-slate-100">
+        <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-slate-600">File type details</summary>
+        <div class="divide-y divide-slate-100">
+          ${group.items.map(renderFileType).join("")}
+        </div>
+      </details>
     </article>
   `;
 }
