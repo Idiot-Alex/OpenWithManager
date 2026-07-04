@@ -11,6 +11,7 @@ public partial class MainWindow : Window
 {
     private readonly FileAssociationService _fileAssociations = new();
     private readonly FileKindService _fileKinds;
+    private readonly FormatCandidateService _formatCandidates;
     private readonly WindowsSettingsService _settings = new();
     private readonly ExportImportService _exports = new();
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         _fileKinds = new FileKindService(_fileAssociations);
+        _formatCandidates = new FormatCandidateService(_fileAssociations);
         InitializeComponent();
         Loaded += OnLoaded;
     }
@@ -69,6 +71,7 @@ public partial class MainWindow : Window
         {
             "fileKinds:list" => _fileKinds.GetFileKinds(),
             "associations:list" => _fileAssociations.GetKnownAssociations(),
+            "formats:candidates" => GetFormatCandidates(request.Payload),
             "settings:openDefaultApps" => OpenDefaultApps(),
             "settings:openExtension" => OpenExtensionSettings(request.Payload),
             "config:export" => ExportConfig(),
@@ -90,6 +93,17 @@ public partial class MainWindow : Window
         var extension = payload.TryGetProperty("extension", out var value) ? value.GetString() : null;
         _settings.OpenDefaultApps(extension);
         return new { opened = true };
+    }
+
+    private object GetFormatCandidates(JsonElement payload)
+    {
+        var extension = payload.TryGetProperty("extension", out var value) ? value.GetString() : null;
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            throw new InvalidOperationException("Missing extension.");
+        }
+
+        return _formatCandidates.GetCandidates(extension);
     }
 
     private object ExportConfig()

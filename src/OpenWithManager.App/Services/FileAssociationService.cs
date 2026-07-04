@@ -78,7 +78,7 @@ public sealed class FileAssociationService
         return key?.GetValue(null) as string;
     }
 
-    private static string? ReadFriendlyName(string? progId)
+    public static string? ReadFriendlyName(string? progId)
     {
         if (string.IsNullOrWhiteSpace(progId))
         {
@@ -97,7 +97,7 @@ public sealed class FileAssociationService
         return string.IsNullOrWhiteSpace(defaultName) ? progId : defaultName;
     }
 
-    private static string? ReadIconDataUrl(string? progId)
+    public static string? ReadIconDataUrl(string? progId)
     {
         var iconPath = ReadOpenCommandPath(progId) ?? ReadIconPath(progId);
         if (string.IsNullOrWhiteSpace(iconPath))

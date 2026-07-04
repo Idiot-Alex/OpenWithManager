@@ -1,0 +1,194 @@
+using OpenWithManager.App.Models;
+using Microsoft.Win32;
+
+namespace OpenWithManager.App.Services;
+
+public sealed class FormatCandidateService
+{
+    private readonly FileAssociationService _fileAssociations;
+
+    public FormatCandidateService(FileAssociationService fileAssociations)
+    {
+        _fileAssociations = fileAssociations;
+    }
+
+    public FormatCandidateResult GetCandidates(string extension)
+    {
+        var normalizedExtension = NormalizeExtension(extension);
+        var currentItem = _fileAssociations
+            .GetKnownAssociations()
+            .FirstOrDefault(item => string.Equals(item.Extension, normalizedExtension, StringComparison.OrdinalIgnoreCase));
+
+        var candidates = new List<FormatAppCandidate>();
+        if (currentItem is not null && !string.IsNullOrWhiteSpace(currentItem.FriendlyName ?? currentItem.ProgId))
+        {
+            candidates.Add(ToCandidate(
+                currentItem.FriendlyName ?? currentItem.ProgId!,
+                currentItem.ProgId,
+                currentItem.IconDataUrl,
+                "Current",
+                true));
+        }
+
+        candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem?.ProgId));
+        candidates.AddRange(ReadOpenWithList(normalizedExtension, currentItem?.ProgId));
+        candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem?.ProgId));
+
+        var distinctCandidates = candidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.AppName))
+            .GroupBy(CandidateKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(candidate => candidate.IsCurrent)
+                .ThenBy(SourcePriority)
+                .First())
+            .OrderByDescending(candidate => candidate.IsCurrent)
+            .ThenBy(SourcePriority)
+            .ThenBy(candidate => candidate.AppName)
+            .ToList();
+
+        return new FormatCandidateResult(
+            normalizedExtension,
+            currentItem?.Description ?? normalizedExtension,
+            distinctCandidates.FirstOrDefault(candidate => candidate.IsCurrent),
+            distinctCandidates);
+    }
+
+    private static IEnumerable<FormatAppCandidate> ReadOpenWithProgIds(string extension, string? currentProgId)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(
+            $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithProgids");
+
+        if (key is null)
+        {
+            yield break;
+        }
+
+        foreach (var progId in key.GetValueNames().Where(value => !string.IsNullOrWhiteSpace(value)))
+        {
+            var appName = FileAssociationService.ReadFriendlyName(progId) ?? progId;
+            yield return ToCandidate(
+                appName,
+                progId,
+                FileAssociationService.ReadIconDataUrl(progId),
+                "OpenWithProgids",
+                string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private static IEnumerable<FormatAppCandidate> ReadOpenWithList(string extension, string? currentProgId)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(
+            $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithList");
+
+        if (key is null)
+        {
+            yield break;
+        }
+
+        foreach (var valueName in key.GetValueNames().Where(name => !string.Equals(name, "MRUList", StringComparison.OrdinalIgnoreCase)))
+        {
+            var executableName = key.GetValue(valueName) as string;
+            if (string.IsNullOrWhiteSpace(executableName))
+            {
+                continue;
+            }
+
+            var appName = ReadApplicationName(executableName) ?? executableName;
+            yield return ToCandidate(appName, null, null, "OpenWithList", false);
+        }
+    }
+
+    private static IEnumerable<FormatAppCandidate> ReadRegisteredApplications(string extension, string? currentProgId)
+    {
+        foreach (var candidate in ReadRegisteredApplications(Registry.CurrentUser, extension, currentProgId))
+        {
+            yield return candidate;
+        }
+
+        foreach (var candidate in ReadRegisteredApplications(Registry.LocalMachine, extension, currentProgId))
+        {
+            yield return candidate;
+        }
+    }
+
+    private static IEnumerable<FormatAppCandidate> ReadRegisteredApplications(
+        RegistryKey hive,
+        string extension,
+        string? currentProgId)
+    {
+        using var registeredApplications = hive.OpenSubKey(@"Software\RegisteredApplications");
+        if (registeredApplications is null)
+        {
+            yield break;
+        }
+
+        foreach (var valueName in registeredApplications.GetValueNames())
+        {
+            var capabilitiesPath = registeredApplications.GetValue(valueName) as string;
+            if (string.IsNullOrWhiteSpace(capabilitiesPath))
+            {
+                continue;
+            }
+
+            using var capabilities = hive.OpenSubKey(capabilitiesPath);
+            using var associations = hive.OpenSubKey($@"{capabilitiesPath}\FileAssociations");
+            var progId = associations?.GetValue(extension) as string;
+            if (string.IsNullOrWhiteSpace(progId))
+            {
+                continue;
+            }
+
+            var appName = capabilities?.GetValue("ApplicationName") as string
+                ?? FileAssociationService.ReadFriendlyName(progId)
+                ?? valueName;
+
+            yield return ToCandidate(
+                appName,
+                progId,
+                FileAssociationService.ReadIconDataUrl(progId),
+                "RegisteredApplication",
+                string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private static string? ReadApplicationName(string executableName)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{executableName}\Application");
+        return key?.GetValue("ApplicationName") as string;
+    }
+
+    private static FormatAppCandidate ToCandidate(
+        string appName,
+        string? progId,
+        string? iconDataUrl,
+        string source,
+        bool isCurrent)
+    {
+        return new FormatAppCandidate(appName, progId, iconDataUrl, source, isCurrent);
+    }
+
+    private static string CandidateKey(FormatAppCandidate candidate)
+    {
+        return !string.IsNullOrWhiteSpace(candidate.ProgId)
+            ? $"prog:{candidate.ProgId}"
+            : $"app:{candidate.AppName}";
+    }
+
+    private static int SourcePriority(FormatAppCandidate candidate)
+    {
+        return candidate.Source switch
+        {
+            "Current" => 0,
+            "RegisteredApplication" => 1,
+            "OpenWithProgids" => 2,
+            "OpenWithList" => 3,
+            _ => 4
+        };
+    }
+
+    private static string NormalizeExtension(string extension)
+    {
+        var value = extension.Trim();
+        return value.StartsWith('.') ? value.ToLowerInvariant() : $".{value.ToLowerInvariant()}";
+    }
+}

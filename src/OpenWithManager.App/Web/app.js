@@ -6,6 +6,10 @@ const state = {
   query: "",
   status: "All",
   selectedId: null,
+  selectedFormat: null,
+  formatCandidates: null,
+  formatLoading: false,
+  selectedCandidateKey: null,
 };
 
 const statusFilters = ["All", "Review"];
@@ -130,6 +134,9 @@ function render() {
   elements.kindList.querySelectorAll("[data-kind-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedId = button.dataset.kindId;
+      state.selectedFormat = null;
+      state.formatCandidates = null;
+      state.selectedCandidateKey = null;
       render();
     });
   });
@@ -255,6 +262,17 @@ function renderDetail() {
   const app = appName(kind.primaryAppName);
   const outliers = kind.outliers || [];
 
+  if (state.selectedFormat && !(kind.extensions || []).includes(state.selectedFormat)) {
+    state.selectedFormat = null;
+    state.formatCandidates = null;
+    state.selectedCandidateKey = null;
+  }
+
+  if (state.selectedFormat) {
+    renderFormatDetail(kind, state.selectedFormat);
+    return;
+  }
+
   elements.detailPanel.innerHTML = `
     <div class="detail-head">
       <div>
@@ -272,7 +290,7 @@ function renderDetail() {
     <div class="format-block">
       <p class="section-label">${escapeHtml(t("includedFormats"))}</p>
       <div class="chips">
-        ${(kind.extensions || []).map((extension) => `<span>${escapeHtml(extension.replace(".", "").toUpperCase())}</span>`).join("")}
+        ${(kind.extensions || []).map(renderFormatChip).join("")}
       </div>
     </div>
 
@@ -300,7 +318,175 @@ function renderDetail() {
 
   document.querySelector("#changeAppButton").addEventListener("click", openDefaultSettings);
   document.querySelector("#openSettingsButton").addEventListener("click", openDefaultSettings);
+  bindFormatChips();
   refreshIcons();
+}
+
+function renderFormatChip(extension) {
+  return `
+    <button class="chip" type="button" data-format-extension="${escapeAttribute(extension)}">
+      ${escapeHtml(formatCode(extension))}
+    </button>
+  `;
+}
+
+function bindFormatChips() {
+  elements.detailPanel.querySelectorAll("[data-format-extension]").forEach((button) => {
+    button.addEventListener("click", () => selectFormat(button.dataset.formatExtension));
+  });
+}
+
+async function selectFormat(extension) {
+  state.selectedFormat = extension;
+  state.formatCandidates = null;
+  state.formatLoading = true;
+  state.selectedCandidateKey = null;
+  render();
+
+  try {
+    const result = host
+      ? await callHost("formats:candidates", { extension })
+      : sampleFormatCandidates(extension);
+
+    if (state.selectedFormat !== extension) {
+      return;
+    }
+
+    state.formatCandidates = result;
+    state.selectedCandidateKey = candidateKey(result.current || result.candidates?.[0]);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (state.selectedFormat === extension) {
+      state.formatLoading = false;
+      render();
+    }
+  }
+}
+
+function renderFormatDetail(kind, extension) {
+  const item = (kind.items || []).find((format) => format.extension === extension);
+  const candidates = state.formatCandidates?.candidates || [];
+  const current = state.formatCandidates?.current || (item
+    ? {
+        appName: appName(item.friendlyName || item.progId),
+        progId: item.progId,
+        iconDataUrl: item.iconDataUrl,
+        source: "Current",
+        isCurrent: true,
+      }
+    : null);
+  const selectedCandidate = candidates.find((candidate) => candidateKey(candidate) === state.selectedCandidateKey)
+    || current
+    || candidates[0];
+
+  elements.detailPanel.innerHTML = `
+    <div class="detail-head">
+      <div>
+        <button class="back-link" type="button" id="backToKindButton">
+          ${icon("arrow-left")}
+          <span>${escapeHtml(t("backToFileKind"))}</span>
+        </button>
+        <p class="eyebrow">${escapeHtml(t("format"))}</p>
+        <h2>${escapeHtml(formatTitle(item, extension))}</h2>
+      </div>
+      <span class="format-code">${escapeHtml(formatCode(extension))}</span>
+    </div>
+
+    <section class="answer">
+      <p>${escapeHtml(t("currentApp"))}</p>
+      ${renderAppIdentity(appName(current?.appName), current?.iconDataUrl, true)}
+    </section>
+
+    <section class="candidate-block">
+      <p class="section-label">${escapeHtml(t("recommendedApps"))}</p>
+      ${state.formatLoading ? renderCandidateLoading() : renderCandidates(candidates)}
+    </section>
+
+    <div class="detail-actions">
+      <button class="button primary" type="button" id="changeFormatButton" ${selectedCandidate ? "" : "disabled"}>
+        ${icon("external-link")}
+        <span>${escapeHtml(t("changeInWindows"))}</span>
+      </button>
+    </div>
+    <p class="settings-hint">${escapeHtml(t("formatSettingsHint", {
+      extension: formatCode(extension),
+      app: appName(selectedCandidate?.appName),
+    }))}</p>
+
+    <details class="technical">
+      <summary>${escapeHtml(t("technicalDetails"))}</summary>
+      <div class="technical-list">
+        ${item ? renderTechnicalItem(item) : ""}
+      </div>
+    </details>
+  `;
+
+  document.querySelector("#backToKindButton").addEventListener("click", () => {
+    state.selectedFormat = null;
+    state.formatCandidates = null;
+    state.selectedCandidateKey = null;
+    render();
+  });
+
+  elements.detailPanel.querySelectorAll("[data-candidate-key]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedCandidateKey = button.dataset.candidateKey;
+      render();
+    });
+  });
+
+  document.querySelector("#changeFormatButton").addEventListener("click", () => openFormatSettings(extension, selectedCandidate));
+  refreshIcons();
+}
+
+function renderCandidateLoading() {
+  return `
+    <div class="candidate-list">
+      <div class="candidate-row muted">${escapeHtml(t("loadingApps"))}</div>
+    </div>
+  `;
+}
+
+function renderCandidates(candidates) {
+  if (!candidates.length) {
+    return `
+      <div class="candidate-list">
+        <div class="candidate-row muted">${escapeHtml(t("noCandidateApps"))}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="candidate-list">
+      ${candidates.map((candidate) => {
+        const key = candidateKey(candidate);
+        const selected = key === state.selectedCandidateKey ? " selected" : "";
+        return `
+          <button class="candidate-row${selected}" type="button" data-candidate-key="${escapeAttribute(key)}">
+            ${renderAppIdentity(appName(candidate.appName), candidate.iconDataUrl)}
+            <span class="candidate-source">${escapeHtml(candidateSourceLabel(candidate.source))}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+async function openFormatSettings(extension, candidate) {
+  try {
+    await callHost("settings:openExtension", {
+      extension,
+      progId: candidate?.progId,
+      appName: candidate?.appName,
+    });
+    showToast(t("chooseInWindowsToast", {
+      extension: formatCode(extension),
+      app: appName(candidate?.appName),
+    }));
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 async function openDefaultSettings() {
@@ -467,6 +653,15 @@ function sourceLabel(source) {
   }[source] || source;
 }
 
+function candidateSourceLabel(source) {
+  return {
+    Current: t("current"),
+    RegisteredApplication: t("recommended"),
+    OpenWithProgids: t("knownForFormat"),
+    OpenWithList: t("usedBefore"),
+  }[source] || source;
+}
+
 function kindTitle(kind) {
   return t(`kind.${kind.id}.name`, {}, kind.displayName);
 }
@@ -481,6 +676,22 @@ function kindDescription(kind) {
 
 function appName(name) {
   return !name || name === "No default app" ? t("noDefaultApp") : name;
+}
+
+function formatTitle(item, extension) {
+  return t(`format.${formatCode(extension).toLowerCase()}.name`, {}, item?.description || extension.toUpperCase());
+}
+
+function formatCode(extension) {
+  return extension.replace(".", "").toUpperCase();
+}
+
+function candidateKey(candidate) {
+  if (!candidate) {
+    return null;
+  }
+
+  return candidate.progId ? `prog:${candidate.progId}` : `app:${candidate.appName}`;
 }
 
 function appInitial(name) {
@@ -584,6 +795,76 @@ function sampleFileKinds() {
       sampleItem(".htm", "HTML document", "Google Chrome", "ChromeHTML"),
     ]),
   ];
+}
+
+function sampleFormatCandidates(extension) {
+  const kind = state.fileKinds.find((item) => (item.extensions || []).includes(extension));
+  const format = kind?.items?.find((item) => item.extension === extension);
+  const current = format
+    ? sampleCandidate(format.friendlyName || format.progId || t("noDefaultApp"), format.progId, "Current", true)
+    : null;
+  const candidates = [
+    current,
+    ...sampleCandidatePool(extension),
+    ...(kind?.items || []).map((item) => sampleCandidate(item.friendlyName || item.progId, item.progId, "OpenWithProgids")),
+  ].filter(Boolean);
+
+  const distinctCandidates = [];
+  const seenCandidateKeys = new Set();
+  candidates.forEach((candidate) => {
+    const key = candidateKey(candidate);
+    if (key && !seenCandidateKeys.has(key)) {
+      seenCandidateKeys.add(key);
+      distinctCandidates.push(candidate);
+    }
+  });
+
+  return {
+    extension,
+    description: format?.description || extension,
+    current,
+    candidates: distinctCandidates,
+  };
+}
+
+function sampleCandidatePool(extension) {
+  if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(extension)) {
+    return [
+      sampleCandidate("Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "RegisteredApplication"),
+      sampleCandidate("Google Chrome", "ChromeHTML", "RegisteredApplication"),
+      sampleCandidate("Visual Studio Code", "VSCode.svg", "OpenWithProgids"),
+    ];
+  }
+
+  if ([".txt", ".md", ".json", ".js", ".ts", ".cs", ".py"].includes(extension)) {
+    return [
+      sampleCandidate("Visual Studio Code", "VSCode.js", "RegisteredApplication"),
+      sampleCandidate("Notepad", "txtfile", "OpenWithList"),
+    ];
+  }
+
+  if (extension === ".pdf") {
+    return [
+      sampleCandidate("Adobe Acrobat", "AcroExch.Document", "RegisteredApplication"),
+      sampleCandidate("Microsoft Edge", "MSEdgePDF", "OpenWithProgids"),
+    ];
+  }
+
+  return [];
+}
+
+function sampleCandidate(appNameValue, progId, source, isCurrent = false) {
+  if (!appNameValue) {
+    return null;
+  }
+
+  return {
+    appName: appNameValue,
+    progId,
+    iconDataUrl: null,
+    source,
+    isCurrent,
+  };
 }
 
 function makeSampleKind(id, displayName, shortName, description, extensions, primaryAppName, primaryProgId, status, items) {
