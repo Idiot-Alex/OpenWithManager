@@ -119,6 +119,7 @@ function groupAssociations(items) {
       const unknownCount = sorted.filter((item) => item.source === "Unknown" || !item.progId).length;
       const appCount = apps.length;
       const mainApp = apps[0]?.[0] || "No default app";
+      const mainAppIconDataUrl = sorted.find((item) => displayAppName(item) === mainApp)?.iconDataUrl || null;
       const status = unknownCount > 0 ? "Needs default" : appCount > 1 ? "Mixed apps" : "Consistent";
 
       return {
@@ -128,6 +129,7 @@ function groupAssociations(items) {
         items: sorted,
         appCount,
         mainApp,
+        mainAppIconDataUrl,
         status,
         unknownCount,
       };
@@ -184,9 +186,10 @@ function renderSection(title, description, groups, expanded) {
 
 function renderGroup(group, expanded) {
   const status = groupStatusDisplay(group);
+  const mainApp = renderAppIdentity(group.mainApp, group.mainAppIconDataUrl, "h-6 w-6", "text-xs");
   const appsLine =
     group.appCount === 1
-      ? `All ${group.items.length} file types open with ${group.mainApp}.`
+      ? `All ${group.items.length} file types open with`
       : `${group.items.length} file types use ${group.appCount} different apps.`;
 
   return `
@@ -197,7 +200,10 @@ function renderGroup(group, expanded) {
             <h3 class="text-lg font-semibold text-slate-900">${escapeHtml(group.title)}</h3>
             <span class="${status.classes}">${status.label}</span>
           </div>
-          <p class="mt-1 text-sm text-slate-500">${escapeHtml(appsLine)}</p>
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <span>${escapeHtml(appsLine)}</span>
+            ${group.appCount === 1 ? mainApp : ""}
+          </div>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
           <button class="btn-secondary" data-open-defaults>Open settings</button>
@@ -214,12 +220,11 @@ function renderGroup(group, expanded) {
 }
 
 function renderFileType(item) {
-  const name = escapeHtml(displayAppName(item));
-  const progId = escapeHtml(item.progId || "No ProgID found");
+  const name = displayAppName(item);
   const source = sourceDisplay(item.source);
 
   return `
-    <div class="grid gap-3 px-5 py-3 transition hover:bg-slate-50 md:grid-cols-[minmax(220px,1fr)_minmax(240px,1.2fr)_150px] md:items-center">
+    <div class="grid gap-3 px-5 py-3 transition hover:bg-slate-50 md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_150px] md:items-center">
       <div class="flex items-center gap-3">
         <span class="grid h-9 min-w-14 place-items-center rounded-md bg-slate-100 px-2 font-mono text-sm font-semibold text-blue-700">${escapeHtml(item.extension)}</span>
         <div>
@@ -227,10 +232,7 @@ function renderFileType(item) {
           <div class="text-xs text-slate-500">${escapeHtml(item.category)}</div>
         </div>
       </div>
-      <div>
-        <div class="font-medium text-slate-900">${name}</div>
-        <div class="mt-0.5 font-mono text-xs text-slate-500">${progId}</div>
-      </div>
+      ${renderAppIdentity(name, item.iconDataUrl, "h-8 w-8", "text-sm")}
       <div class="flex items-center justify-between gap-2 md:justify-end">
         <span class="${source.classes}">${source.label}</span>
         <button class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50" data-open-extension="${escapeHtml(item.extension)}">Change</button>
@@ -256,6 +258,24 @@ function renderDiff(item) {
 
 function displayAppName(item) {
   return item.friendlyName || item.progId || "No default app";
+}
+
+function renderAppIdentity(name, iconDataUrl, sizeClass, textClass) {
+  const safeName = escapeHtml(name);
+  const icon = iconDataUrl
+    ? `<img class="${sizeClass} rounded-md object-contain" src="${escapeAttribute(iconDataUrl)}" alt="" />`
+    : `<span class="${sizeClass} grid place-items-center rounded-md bg-slate-100 font-semibold text-slate-500">${escapeHtml(appInitial(name))}</span>`;
+
+  return `
+    <div class="flex min-w-0 items-center gap-2">
+      ${icon}
+      <span class="truncate font-medium text-slate-900 ${textClass}">${safeName}</span>
+    </div>
+  `;
+}
+
+function appInitial(name) {
+  return (name || "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 function categoryTitle(category) {
@@ -389,4 +409,8 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#096;");
 }
