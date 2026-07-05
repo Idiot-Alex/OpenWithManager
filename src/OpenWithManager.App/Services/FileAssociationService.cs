@@ -44,16 +44,19 @@ public sealed class FileAssociationService
             .Select(extension =>
             {
                 var userChoice = ReadUserChoice(extension.Extension);
+                var shellProgId = ReadAssociationString(extension.Extension, AssocString.ProgId);
                 var fallback = ReadClassDefault(extension.Extension);
-                var progId = userChoice ?? fallback;
+                var progId = userChoice ?? shellProgId ?? fallback;
+                var appName = ReadAssociationString(extension.Extension, AssocString.FriendlyAppName)
+                    ?? ReadFriendlyName(progId);
 
                 return new FileAssociationItem(
                     extension.Extension,
                     extension.Category,
                     extension.Description,
                     progId,
-                    ReadFriendlyName(progId),
-                    userChoice is not null ? "UserChoice" : fallback is not null ? "Registry" : "Unknown");
+                    appName,
+                    userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
             .ThenBy(item => item.Extension)
@@ -108,6 +111,14 @@ public sealed class FileAssociationService
         var buffer = new StringBuilder(512);
         var result = SHLoadIndirectString(value, buffer, (uint)buffer.Capacity, IntPtr.Zero);
         return result >= 0 && buffer.Length > 0 ? buffer.ToString() : value;
+    }
+
+    private static string? ReadAssociationString(string extension, AssocString value)
+    {
+        var length = 1024u;
+        var buffer = new StringBuilder((int)length);
+        var result = AssocQueryString(AssocFlags.None, value, extension, null, buffer, ref length);
+        return result >= 0 && buffer.Length > 0 ? ResolveDisplayName(buffer.ToString()) : null;
     }
 
     public static AppIconLocation? ReadIconLocation(string? progId)
@@ -221,6 +232,26 @@ public sealed class FileAssociationService
         StringBuilder output,
         uint outputLength,
         IntPtr reserved);
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+    private static extern int AssocQueryString(
+        AssocFlags flags,
+        AssocString value,
+        string association,
+        string? extra,
+        StringBuilder output,
+        ref uint outputLength);
+
+    private enum AssocFlags
+    {
+        None = 0
+    }
+
+    private enum AssocString
+    {
+        FriendlyAppName = 4,
+        ProgId = 20
+    }
 
     private sealed record KnownExtension(string Extension, string Category, string Description);
 }

@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
     private readonly ObservableCollection<FileKindSummary> _visibleKinds = [];
+    private bool _refreshOnNextActivation;
 
     public MainWindow()
     {
@@ -30,6 +31,7 @@ public partial class MainWindow : Window
         UpdateStaticText();
         KindList.ItemsSource = _visibleKinds;
         Loaded += async (_, _) => await LoadFileKindsAsync();
+        Activated += async (_, _) => await RefreshAfterExternalSettingsAsync();
     }
 
     private async Task LoadFileKindsAsync()
@@ -169,20 +171,7 @@ public partial class MainWindow : Window
         AddSection(t("currentApp"), DisplayAppName(_state.SelectedKind.PrimaryAppName), true);
 
         AddSectionLabel(t("includedFormats"));
-        var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 22) };
-        foreach (var extension in _state.SelectedKind.Extensions)
-        {
-            var button = new Button
-            {
-                Content = FormatCode(extension),
-                Tag = extension,
-                Style = (Style)FindResource("PillButton"),
-                Margin = new Thickness(0, 0, 8, 8),
-            };
-            button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
-            chips.Children.Add(button);
-        }
-        DetailPanel.Children.Add(chips);
+        AddFormatRows(_state.SelectedKind);
 
         if (_state.SelectedKind.Outliers.Count > 0)
         {
@@ -360,12 +349,30 @@ public partial class MainWindow : Window
     private async Task OpenDefaultSettingsAsync()
     {
         await Task.Run(() => _settings.OpenDefaultApps());
+        _refreshOnNextActivation = true;
     }
 
     private async Task OpenFormatSettingsAsync(string extension, FormatAppCandidate? candidate)
     {
         await Task.Run(() => _settings.OpenDefaultApps(candidate?.SettingsParameterName, candidate?.SettingsParameterValue));
+        _refreshOnNextActivation = true;
         MessageBox.Show(this, FormatSettingsHint(extension, candidate), t("openSettings"), MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private async Task RefreshAfterExternalSettingsAsync()
+    {
+        if (!_refreshOnNextActivation || _state.IsLoading)
+        {
+            return;
+        }
+
+        _refreshOnNextActivation = false;
+        var selectedExtension = _state.SelectedFormat?.Extension;
+        await LoadFileKindsAsync();
+        if (!string.IsNullOrWhiteSpace(selectedExtension))
+        {
+            await SelectFormatAsync(selectedExtension);
+        }
     }
 
     private async Task MakeFormatDefaultAsync(string extension, FormatAppCandidate? candidate)
@@ -431,6 +438,58 @@ public partial class MainWindow : Window
         }
         expander.Content = stack;
         DetailPanel.Children.Add(expander);
+    }
+
+    private void AddFormatRows(FileKindSummary kind)
+    {
+        var byExtension = kind.Items.ToDictionary(item => item.Extension, StringComparer.OrdinalIgnoreCase);
+        var rows = new StackPanel { Margin = new Thickness(0, 8, 0, 22) };
+
+        foreach (var extension in kind.Extensions)
+        {
+            byExtension.TryGetValue(extension, out var item);
+            rows.Children.Add(MakeFormatRowButton(extension, DisplayAppName(item?.FriendlyName ?? item?.ProgId)));
+        }
+
+        DetailPanel.Children.Add(rows);
+    }
+
+    private Button MakeFormatRowButton(string extension, string appName)
+    {
+        var content = new Grid();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var code = new TextBlock
+        {
+            Text = FormatCode(extension),
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var app = new TextBlock
+        {
+            Text = appName,
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(app, 1);
+        content.Children.Add(code);
+        content.Children.Add(app);
+
+        var button = new Button
+        {
+            Content = content,
+            Tag = extension,
+            Style = (Style)FindResource("BaseButton"),
+            Margin = new Thickness(0, 0, 0, 8),
+            Padding = new Thickness(12, 9, 12, 9),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch
+        };
+        button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
+        return button;
     }
 
     private void AddSection(string label, string value, bool large = false)
