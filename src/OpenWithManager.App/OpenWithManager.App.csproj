@@ -7,15 +7,4 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon />
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Web\index.html;Web\styles.css;Web\i18n.js;Web\app.js;Web\vendor\lucide-1.23.0.min.js;Web\vendor\lucide-LICENSE.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="Web\preview.html;Web\preview.js" />
-  </ItemGroup>
 </Project>

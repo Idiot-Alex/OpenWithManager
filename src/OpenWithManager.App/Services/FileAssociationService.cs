@@ -56,7 +56,7 @@ public sealed class FileAssociationService
                     extension.Description,
                     progId,
                     ReadFriendlyName(progId),
-                    ReadIconDataUrl(progId),
+                    null,
                     userChoice is not null ? "UserChoice" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
