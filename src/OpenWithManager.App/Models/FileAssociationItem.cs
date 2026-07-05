@@ -6,5 +6,4 @@ public sealed record FileAssociationItem(
     string Description,
     string? ProgId,
     string? FriendlyName,
-    AppIconLocation? Icon,
     string Source);

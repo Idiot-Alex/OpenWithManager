@@ -7,7 +7,6 @@ public sealed class LocalizationService
         ["appTagline"] = "Choose apps for file kinds.",
         ["searchPlaceholder"] = "Search files or apps",
         ["refresh"] = "Refresh",
-        ["compare"] = "Compare",
         ["fileKinds"] = "File kinds",
         ["emptyNoMatch"] = "No matching file kinds.",
         ["all"] = "All",
@@ -38,25 +37,17 @@ public sealed class LocalizationService
         ["noDefaultApp"] = "No default app",
         ["noAppSet"] = "No app set",
         ["allSet"] = "All set",
-        ["mixedStatus"] = "Mixed",
-        ["missingStatus"] = "Missing",
-        ["consistentStatus"] = "Consistent",
         ["oneException"] = "1 exception",
         ["exceptionsCount"] = "{count} exceptions",
         ["readingDefaultsTitle"] = "Reading defaults",
         ["readingDefaultsBody"] = "Checking the apps Windows uses for your files.",
         ["loadFailedTitle"] = "Could not read defaults",
-        ["exportToast"] = "Exported {count} file associations.",
-        ["importedSummary"] = "{count} imported associations compared with this PC.",
-        ["snapshotComparison"] = "Snapshot comparison",
         ["current"] = "Current",
         ["none"] = "none",
-        ["changed"] = "Changed",
         ["setAsDefault"] = "Set as default",
         ["confirmSetDefault"] = "Set {app} as the default app for {extension}? This will immediately change your Windows default app setting.",
         ["setDefaultToast"] = "{extension} now opens with {app}.",
-        ["openSettings"] = "Open settings",
-        ["export"] = "Export"
+        ["openSettings"] = "Open settings"
     };
 
     private static readonly Dictionary<string, string> Zh = new()
@@ -64,7 +55,6 @@ public sealed class LocalizationService
         ["appTagline"] = "为文件类型选择打开应用。",
         ["searchPlaceholder"] = "搜索文件或应用",
         ["refresh"] = "刷新",
-        ["compare"] = "对比",
         ["fileKinds"] = "文件类型",
         ["emptyNoMatch"] = "没有匹配的文件类型。",
         ["all"] = "全部",
@@ -95,25 +85,17 @@ public sealed class LocalizationService
         ["noDefaultApp"] = "未设置默认应用",
         ["noAppSet"] = "未设置",
         ["allSet"] = "已设置",
-        ["mixedStatus"] = "不一致",
-        ["missingStatus"] = "未设置",
-        ["consistentStatus"] = "一致",
         ["oneException"] = "1 个例外",
         ["exceptionsCount"] = "{count} 个例外",
         ["readingDefaultsTitle"] = "正在读取默认项",
         ["readingDefaultsBody"] = "正在检查 Windows 用哪些应用打开你的文件。",
         ["loadFailedTitle"] = "无法读取默认项",
-        ["exportToast"] = "已导出 {count} 个文件关联。",
-        ["importedSummary"] = "已将 {count} 个导入关联与本机对比。",
-        ["snapshotComparison"] = "快照对比",
         ["current"] = "当前",
         ["none"] = "无",
-        ["changed"] = "已改变",
         ["setAsDefault"] = "设为默认",
         ["confirmSetDefault"] = "要将 {extension} 的默认打开应用改为 {app} 吗？此操作会立即修改 Windows 默认应用设置。",
         ["setDefaultToast"] = "{extension} 现在将使用 {app} 打开。",
-        ["openSettings"] = "打开设置",
-        ["export"] = "导出"
+        ["openSettings"] = "打开设置"
     };
 
     public bool IsChinese { get; private set; } = true;

@@ -8,10 +8,8 @@ public sealed record FileKindSummary(
     IReadOnlyCollection<string> Extensions,
     string? PrimaryAppName,
     string? PrimaryProgId,
-    AppIconLocation? PrimaryIcon,
     int MatchingFormats,
     int TotalFormats,
     FileKindStatus Status,
-    string StatusText,
     IReadOnlyCollection<FileKindOutlier> Outliers,
     IReadOnlyCollection<FileAssociationItem> Items);

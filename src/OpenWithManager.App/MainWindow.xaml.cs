@@ -5,7 +5,6 @@ using System.Windows.Media;
 using OpenWithManager.App.Models;
 using OpenWithManager.App.Services;
 using OpenWithManager.App.ViewModels;
-using Microsoft.Win32;
 
 namespace OpenWithManager.App;
 
@@ -16,7 +15,6 @@ public partial class MainWindow : Window
     private readonly FileKindService _fileKinds;
     private readonly FormatCandidateService _formatCandidates;
     private readonly WindowsSettingsService _settings = new();
-    private readonly ExportImportService _exports = new();
     private readonly LocalizationService _text = new();
     private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
@@ -116,7 +114,6 @@ public partial class MainWindow : Window
             kind.PrimaryAppName,
             kind.PrimaryProgId,
             kind.Status.ToString(),
-            StatusLabel(kind.Status),
             string.Join(" ", kind.Extensions),
             string.Join(" ", kind.Items.SelectMany(item => new[]
             {
@@ -133,17 +130,7 @@ public partial class MainWindow : Window
 
     private FileKindSummary LocalizeKind(FileKindSummary kind)
     {
-        return kind with { StatusText = StatusLabel(kind.Status) };
-    }
-
-    private string StatusLabel(FileKindStatus status)
-    {
-        return status switch
-        {
-            FileKindStatus.Mixed => t("mixedStatus"),
-            FileKindStatus.Missing => t("missingStatus"),
-            _ => t("consistentStatus")
-        };
+        return kind with { PrimaryAppName = DisplayAppName(kind.PrimaryAppName) };
     }
 
     private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindSummary> visible)
@@ -703,45 +690,6 @@ public partial class MainWindow : Window
         await OpenDefaultSettingsAsync();
     }
 
-    private void OnExportClicked(object sender, RoutedEventArgs e)
-    {
-        var dialog = new SaveFileDialog
-        {
-            Title = "Export default app associations",
-            Filter = "JSON files (*.json)|*.json",
-            FileName = $"default-app-associations-{DateTime.Now:yyyyMMdd-HHmm}.json"
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        var associations = _fileAssociations.GetKnownAssociations();
-        _exports.Export(dialog.FileName, associations);
-        MessageBox.Show(this, t("exportToast", ("count", associations.Count.ToString())), t("export"), MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-
-    private void OnImportClicked(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Import default app associations",
-            Filter = "JSON files (*.json)|*.json"
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
-
-        var imported = _exports.Import(dialog.FileName);
-        var current = _fileAssociations.GetKnownAssociations();
-        var diff = _exports.Compare(current, imported);
-        var changed = diff.Count(item => item.Status != "Same");
-        MessageBox.Show(this, $"{t("importedSummary", ("count", imported.Count.ToString()))}\n{t("changed")}: {changed}", t("snapshotComparison"), MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-
     private string t(string key, params (string Key, string Value)[] values)
     {
         return _text.T(key, values);
@@ -753,8 +701,6 @@ public partial class MainWindow : Window
         SearchBox.ToolTip = t("searchPlaceholder");
         LanguageButton.Content = _text.LanguageLabel;
         RefreshButton.Content = t("refresh");
-        ExportButton.Content = t("export");
-        CompareButton.Content = t("compare");
         SettingsButton.Content = t("openSettings");
         FileKindsLabel.Text = t("fileKinds");
     }

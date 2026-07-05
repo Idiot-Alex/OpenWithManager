@@ -5,7 +5,7 @@ A Windows desktop MVP for viewing and managing file default app associations.
 This project uses:
 
 - WPF/XAML for the native Windows interface
-- C# services for registry reads, Shell association handler discovery, Windows Settings launch, export, and import comparison
+- C# services for registry reads, Shell association handler discovery, and Windows Settings launch
 
 ## Current MVP
 
@@ -15,8 +15,6 @@ This project uses:
 - Open Windows default apps settings
 - Show candidate apps for a selected file format
 - Set a default app only after an explicit user confirmation, using Windows Shell association APIs
-- Export a JSON snapshot of current associations
-- Import a JSON snapshot and compare it with the current machine
 
 The app must not silently or forcibly change default app associations. Windows 10/11 protects default app choices, and direct registry writes can be ignored or reset by the OS. Any default app change should be user-initiated, confirmed in the UI, and performed through supported Windows Shell or Settings flows.
 

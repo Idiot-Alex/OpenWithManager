@@ -55,8 +55,6 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="LanguageButton" Style="{StaticResource IconButton}" Content="中" Click="OnLanguageClicked" />
                 <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Content="Refresh" Click="OnRefreshClicked" />
-                <Button x:Name="ExportButton" Style="{StaticResource IconButton}" Content="Export" Click="OnExportClicked" />
-                <Button x:Name="CompareButton" Style="{StaticResource IconButton}" Content="Compare" Click="OnImportClicked" />
                 <Button x:Name="SettingsButton" Style="{StaticResource PrimaryButton}" Content="Open settings" Click="OnOpenSettingsClicked" />
             </StackPanel>
         </Grid>
@@ -132,23 +130,14 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="44" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Border Width="36" Height="36" Background="{StaticResource SubtleBrush}" CornerRadius="7">
-                                        <Grid>
-                                            <TextBlock Text="{Binding ShortName}"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource InkBrush}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
-                                            <Image Source="{Binding PrimaryIcon, Converter={StaticResource AppIconConverter}}"
-                                                   Width="22"
-                                                   Height="22"
-                                                   Stretch="Uniform"
+                                        <TextBlock Text="{Binding ShortName}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkBrush}"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center" />
-                                        </Grid>
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding DisplayName}"
@@ -159,18 +148,6 @@
                                                    Foreground="{StaticResource MutedBrush}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <Border Grid.Column="2"
-                                            Padding="8,4"
-                                            Background="{StaticResource SurfaceBrush}"
-                                            BorderBrush="{StaticResource LineBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="10"
-                                            VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding StatusText}"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold" />
-                                    </Border>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

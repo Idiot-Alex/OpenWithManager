@@ -5,8 +5,8 @@
 - `OpenWithManager.sln` is the solution entry point.
 - `src/OpenWithManager.App/` contains the WPF app project.
 - `MainWindow.xaml` and `MainWindow.xaml.cs` host the WPF shell and UI event flow.
-- `Models/` contains data types for associations and diffs.
-- `Services/` contains registry reads, Shell association handler discovery, Windows Settings launch logic, export, and import comparison.
+- `Models/` contains data types for associations, file kinds, and app candidates.
+- `Services/` contains registry reads, Shell association handler discovery, Windows Settings launch logic, localization, and icon loading.
 - `Resources/` contains shared WPF styles.
 - `ViewModels/` contains UI state types.
 
@@ -38,7 +38,7 @@ Use 4-space indentation for C# and XAML, and 2-space indentation for HTML, CSS, 
 
 ## Testing Guidelines
 
-When adding tests, prefer focused unit tests for `Services/` behavior and small integration tests around export/import JSON formats. Name test files after the class under test, such as `ExportImportServiceTests.cs`. Avoid tests that modify real Windows default app associations; mock registry-dependent behavior where possible.
+When adding tests, prefer focused unit tests for `Services/` behavior and small integration tests around file-kind aggregation and candidate discovery. Name test files after the class under test, such as `FileKindServiceTests.cs`. Avoid tests that modify real Windows default app associations; mock registry-dependent behavior where possible.
 
 ## Commit & Pull Request Guidelines
 
@@ -48,4 +48,4 @@ Pull requests should include a short description, manual verification steps, lin
 
 ## Security & Configuration Tips
 
-Do not silently or forcibly change default app associations. Windows 10/11 protects these choices, and direct registry writes can be ignored or reset. Prefer read-only inspection, export/import comparison, and official Windows Settings pages. When the app offers a default-app change, it must be clearly user-initiated, require explicit confirmation, and use supported Windows Shell or Settings flows rather than direct registry writes.
+Do not silently or forcibly change default app associations. Windows 10/11 protects these choices, and direct registry writes can be ignored or reset. Prefer read-only inspection and official Windows Settings pages. When the app offers a default-app change, it must be clearly user-initiated, require explicit confirmation, and use supported Windows Shell or Settings flows rather than direct registry writes.

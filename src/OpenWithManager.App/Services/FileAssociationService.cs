@@ -59,7 +59,6 @@ public sealed class FileAssociationService
                     extension.Description,
                     progId,
                     appName,
-                    progId is null ? null : ReadIconLocation(progId),
                     userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
