@@ -53,7 +53,6 @@ public sealed class ShellAssociationService
                     yield return new FormatAppCandidate(
                         appName,
                         null,
-                        ReadIconDataUrl(handler),
                         source,
                         false,
                         ShellHandlerId: handlerId,
@@ -117,25 +116,6 @@ public sealed class ShellAssociationService
         finally
         {
             Marshal.FreeCoTaskMem(value);
-        }
-    }
-
-    private static string? ReadIconDataUrl(IAssocHandler handler)
-    {
-        var result = handler.GetIconLocation(out var iconPath, out _);
-        if (result < 0 || iconPath == IntPtr.Zero)
-        {
-            return null;
-        }
-
-        try
-        {
-            var path = Marshal.PtrToStringUni(iconPath);
-            return FileAssociationService.ReadFileIconDataUrl(path);
-        }
-        finally
-        {
-            Marshal.FreeCoTaskMem(iconPath);
         }
     }
 

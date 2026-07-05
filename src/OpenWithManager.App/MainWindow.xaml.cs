@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using OpenWithManager.App.Models;
 using OpenWithManager.App.Services;
+using OpenWithManager.App.ViewModels;
 using Microsoft.Win32;
 
 namespace OpenWithManager.App;
@@ -16,17 +17,9 @@ public partial class MainWindow : Window
     private readonly FormatCandidateService _formatCandidates;
     private readonly WindowsSettingsService _settings = new();
     private readonly ExportImportService _exports = new();
+    private readonly LocalizationService _text = new();
+    private readonly MainWindowState _state = new();
     private readonly ObservableCollection<FileKindSummary> _visibleKinds = [];
-
-    private List<FileKindSummary> _allKinds = [];
-    private string _status = "All";
-    private string _query = "";
-    private FileKindSummary? _selectedKind;
-    private FormatCandidateResult? _selectedFormat;
-    private FormatAppCandidate? _selectedCandidate;
-    private bool _isChinese = true;
-    private bool _isLoading;
-    private string? _loadError;
 
     public MainWindow()
     {
@@ -40,36 +33,36 @@ public partial class MainWindow : Window
 
     private async Task LoadFileKindsAsync()
     {
-        _isLoading = true;
-        _loadError = null;
-        _selectedFormat = null;
-        _selectedCandidate = null;
+        _state.IsLoading = true;
+        _state.LoadError = null;
+        _state.SelectedFormat = null;
+        _state.SelectedCandidate = null;
         RenderLoading();
 
         try
         {
             var kinds = await Task.Run(_fileKinds.GetFileKinds);
-            _allKinds = kinds;
-            _selectedKind = _selectedKind is null
-                ? _allKinds.FirstOrDefault()
-                : _allKinds.FirstOrDefault(kind => kind.Id == _selectedKind.Id) ?? _allKinds.FirstOrDefault();
+            _state.AllKinds = kinds;
+            _state.SelectedKind = _state.SelectedKind is null
+                ? _state.AllKinds.FirstOrDefault()
+                : _state.AllKinds.FirstOrDefault(kind => kind.Id == _state.SelectedKind.Id) ?? _state.AllKinds.FirstOrDefault();
         }
         catch (Exception ex)
         {
-            _loadError = ex.Message;
-            _allKinds = [];
-            _selectedKind = null;
+            _state.LoadError = ex.Message;
+            _state.AllKinds = [];
+            _state.SelectedKind = null;
         }
         finally
         {
-            _isLoading = false;
+            _state.IsLoading = false;
             ApplyFilter();
         }
     }
 
     private void ApplyFilter()
     {
-        var visible = _allKinds
+        var visible = _state.AllKinds
             .Where(MatchesFilter)
             .ToList();
 
@@ -79,12 +72,12 @@ public partial class MainWindow : Window
             _visibleKinds.Add(kind);
         }
 
-        if (_selectedKind is null || !visible.Any(kind => kind.Id == _selectedKind.Id))
+        if (_state.SelectedKind is null || !visible.Any(kind => kind.Id == _state.SelectedKind.Id))
         {
-            _selectedKind = visible.FirstOrDefault() ?? _allKinds.FirstOrDefault();
+            _state.SelectedKind = visible.FirstOrDefault() ?? _state.AllKinds.FirstOrDefault();
         }
 
-        KindList.SelectedItem = _selectedKind;
+        KindList.SelectedItem = _state.SelectedKind;
         EmptyText.Visibility = ShouldShowEmptyText(visible) ? Visibility.Visible : Visibility.Collapsed;
         EmptyText.Text = t("emptyNoMatch");
         UpdateStaticText();
@@ -94,12 +87,12 @@ public partial class MainWindow : Window
 
     private bool MatchesFilter(FileKindSummary kind)
     {
-        if (_status == "Review" && kind.Status == "Consistent")
+        if (_state.Status == "Review" && kind.Status == "Consistent")
         {
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(_query))
+        if (string.IsNullOrWhiteSpace(_state.Query))
         {
             return true;
         }
@@ -123,15 +116,15 @@ public partial class MainWindow : Window
             }))
         });
 
-        return text.Contains(_query, StringComparison.OrdinalIgnoreCase);
+        return text.Contains(_state.Query, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindSummary> visible)
     {
-        var hasFilter = !string.IsNullOrWhiteSpace(_query) || _status != "All";
-        return !_isLoading
-            && _loadError is null
-            && _allKinds.Count > 0
+        var hasFilter = !string.IsNullOrWhiteSpace(_state.Query) || _state.Status != "All";
+        return !_state.IsLoading
+            && _state.LoadError is null
+            && _state.AllKinds.Count > 0
             && visible.Count == 0
             && hasFilter;
     }
@@ -149,20 +142,20 @@ public partial class MainWindow : Window
     {
         DetailPanel.Children.Clear();
 
-        if (_loadError is not null)
+        if (_state.LoadError is not null)
         {
             AddTitle(t("loadFailedTitle"));
-            AddMuted(_loadError);
+            AddMuted(_state.LoadError);
             return;
         }
 
-        if (_selectedFormat is not null)
+        if (_state.SelectedFormat is not null)
         {
-            RenderFormatDetail(_selectedFormat);
+            RenderFormatDetail(_state.SelectedFormat);
             return;
         }
 
-        if (_selectedKind is null)
+        if (_state.SelectedKind is null)
         {
             AddTitle(t("noFileKindSelected"));
             AddMuted(t("pickFileKind"));
@@ -170,13 +163,13 @@ public partial class MainWindow : Window
         }
 
         AddEyebrow(t("fileKind"));
-        AddTitle(_selectedKind.DisplayName);
-        AddStatus(_selectedKind);
-        AddSection(t("currentApp"), DisplayAppName(_selectedKind.PrimaryAppName), true);
+        AddTitle(_state.SelectedKind.DisplayName);
+        AddStatus(_state.SelectedKind);
+        AddSection(t("currentApp"), DisplayAppName(_state.SelectedKind.PrimaryAppName), true);
 
         AddSectionLabel(t("includedFormats"));
         var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 22) };
-        foreach (var extension in _selectedKind.Extensions)
+        foreach (var extension in _state.SelectedKind.Extensions)
         {
             var button = new Button
             {
@@ -190,10 +183,10 @@ public partial class MainWindow : Window
         }
         DetailPanel.Children.Add(chips);
 
-        if (_selectedKind.Outliers.Count > 0)
+        if (_state.SelectedKind.Outliers.Count > 0)
         {
             AddSectionLabel(t("exceptions"));
-            foreach (var outlier in _selectedKind.Outliers)
+            foreach (var outlier in _state.SelectedKind.Outliers)
             {
                 AddMuted($"{outlier.Extension.ToUpperInvariant()}  {DisplayAppName(outlier.AppName)}");
             }
@@ -205,7 +198,7 @@ public partial class MainWindow : Window
         DetailPanel.Children.Add(actions);
         AddMuted(t("settingsHint"));
 
-        AddTechnicalItems(_selectedKind.Items);
+        AddTechnicalItems(_state.SelectedKind.Items);
     }
 
     private async Task SelectFormatAsync(string extension)
@@ -214,8 +207,8 @@ public partial class MainWindow : Window
         AddTitle(t("loadingApps"));
         try
         {
-            _selectedFormat = await Task.Run(() => _formatCandidates.GetCandidates(extension));
-            _selectedCandidate = _selectedFormat.Current ?? _selectedFormat.Candidates.FirstOrDefault();
+            _state.SelectedFormat = await Task.Run(() => _formatCandidates.GetCandidates(extension));
+            _state.SelectedCandidate = _state.SelectedFormat.Current ?? _state.SelectedFormat.Candidates.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -227,13 +220,13 @@ public partial class MainWindow : Window
 
     private void RenderFormatDetail(FormatCandidateResult format)
     {
-        var item = _selectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
-        _selectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
+        var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
+        _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
         var back = MakeButton(t("backToFileKind"), (_, _) =>
         {
-            _selectedFormat = null;
-            _selectedCandidate = null;
+            _state.SelectedFormat = null;
+            _state.SelectedCandidate = null;
             RenderDetail();
         });
         DetailPanel.Children.Add(back);
@@ -257,14 +250,14 @@ public partial class MainWindow : Window
         }
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 8) };
-        actions.Children.Add(MakeButton(FormatActionLabel(_selectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _selectedCandidate), true));
-        if (_selectedCandidate?.CanMakeDefault == true)
+        actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
+        if (_state.SelectedCandidate?.CanMakeDefault == true)
         {
-            actions.Children.Add(MakeButton(t("setAsDefault"), async (_, _) => await MakeFormatDefaultAsync(format.Extension, _selectedCandidate)));
+            actions.Children.Add(MakeButton(t("setAsDefault"), async (_, _) => await MakeFormatDefaultAsync(format.Extension, _state.SelectedCandidate)));
         }
         DetailPanel.Children.Add(actions);
 
-        AddMuted(FormatSettingsHint(format.Extension, _selectedCandidate));
+        AddMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
         if (item is not null)
         {
             AddTechnicalItems([item]);
@@ -273,7 +266,7 @@ public partial class MainWindow : Window
 
     private Button MakeCandidateButton(FormatAppCandidate candidate)
     {
-        var isSelected = candidate == _selectedCandidate;
+        var isSelected = candidate == _state.SelectedCandidate;
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -318,7 +311,7 @@ public partial class MainWindow : Window
         };
         button.Click += (_, _) =>
         {
-            _selectedCandidate = candidate;
+            _state.SelectedCandidate = candidate;
             RenderDetail();
         };
         return button;
@@ -483,10 +476,10 @@ public partial class MainWindow : Window
 
     private void UpdateFilterButtons()
     {
-        AllFilterButton.Content = $"{t("all")} ({_allKinds.Count})";
-        ReviewFilterButton.Content = $"{t("needsReview")} ({_allKinds.Count(NeedsReview)})";
-        AllFilterButton.Style = (Style)FindResource(_status == "All" ? "PrimaryButton" : "IconButton");
-        ReviewFilterButton.Style = (Style)FindResource(_status == "Review" ? "PrimaryButton" : "IconButton");
+        AllFilterButton.Content = $"{t("all")} ({_state.AllKinds.Count})";
+        ReviewFilterButton.Content = $"{t("needsReview")} ({_state.AllKinds.Count(NeedsReview)})";
+        AllFilterButton.Style = (Style)FindResource(_state.Status == "All" ? "PrimaryButton" : "IconButton");
+        ReviewFilterButton.Style = (Style)FindResource(_state.Status == "Review" ? "PrimaryButton" : "IconButton");
     }
 
     private static bool NeedsReview(FileKindSummary kind)
@@ -536,20 +529,20 @@ public partial class MainWindow : Window
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
     {
-        _query = SearchBox.Text.Trim();
+        _state.Query = SearchBox.Text.Trim();
         ApplyFilter();
     }
 
     private void OnKindSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (KindList.SelectedItem is not FileKindSummary kind || _selectedKind?.Id == kind.Id)
+        if (KindList.SelectedItem is not FileKindSummary kind || _state.SelectedKind?.Id == kind.Id)
         {
             return;
         }
 
-        _selectedKind = kind;
-        _selectedFormat = null;
-        _selectedCandidate = null;
+        _state.SelectedKind = kind;
+        _state.SelectedFormat = null;
+        _state.SelectedCandidate = null;
         RenderDetail();
     }
 
@@ -560,19 +553,19 @@ public partial class MainWindow : Window
 
     private void OnAllFilterClicked(object sender, RoutedEventArgs e)
     {
-        _status = "All";
+        _state.Status = "All";
         ApplyFilter();
     }
 
     private void OnReviewFilterClicked(object sender, RoutedEventArgs e)
     {
-        _status = "Review";
+        _state.Status = "Review";
         ApplyFilter();
     }
 
     private void OnLanguageClicked(object sender, RoutedEventArgs e)
     {
-        _isChinese = !_isChinese;
+        _text.ToggleLanguage();
         ApplyFilter();
     }
 
@@ -622,131 +615,18 @@ public partial class MainWindow : Window
 
     private string t(string key, params (string Key, string Value)[] values)
     {
-        var text = (_isChinese ? Zh : En).TryGetValue(key, out var template) ? template : key;
-        foreach (var (name, replacement) in values)
-        {
-            text = text.Replace($"{{{name}}}", replacement);
-        }
-        return text;
+        return _text.T(key, values);
     }
 
     private void UpdateStaticText()
     {
         TaglineText.Text = t("appTagline");
         SearchBox.ToolTip = t("searchPlaceholder");
-        LanguageButton.Content = _isChinese ? "中" : "EN";
+        LanguageButton.Content = _text.LanguageLabel;
         RefreshButton.Content = t("refresh");
         ExportButton.Content = t("export");
         CompareButton.Content = t("compare");
         SettingsButton.Content = t("openSettings");
         FileKindsLabel.Text = t("fileKinds");
     }
-
-    private static readonly Dictionary<string, string> En = new()
-    {
-        ["appTagline"] = "Choose apps for file kinds.",
-        ["searchPlaceholder"] = "Search files or apps",
-        ["refresh"] = "Refresh",
-        ["compare"] = "Compare",
-        ["fileKinds"] = "File kinds",
-        ["emptyNoMatch"] = "No matching file kinds.",
-        ["all"] = "All",
-        ["needsReview"] = "Needs review",
-        ["noFileKindSelected"] = "No file kind selected",
-        ["pickFileKind"] = "Pick a file kind to see its current app.",
-        ["fileKind"] = "File kind",
-        ["format"] = "Format",
-        ["backToFileKind"] = "Back",
-        ["currentApp"] = "Current app",
-        ["recommendedApps"] = "Recommended apps",
-        ["recommended"] = "Recommended",
-        ["availableApp"] = "Available",
-        ["knownForFormat"] = "Known for this format",
-        ["usedBefore"] = "Used before",
-        ["loadingApps"] = "Finding apps for this format.",
-        ["noCandidateApps"] = "No candidate apps found.",
-        ["changeInWindows"] = "Change in Windows",
-        ["openAppDefaults"] = "Open app defaults",
-        ["formatSettingsHint"] = "Windows will ask you to choose {app} for {extension}.",
-        ["appDefaultsHint"] = "Windows will open {app}'s default app page. Find {extension} there and confirm your choice.",
-        ["includedFormats"] = "Included formats",
-        ["exceptions"] = "Exceptions",
-        ["chooseApp"] = "Choose app",
-        ["openDefaultApps"] = "Open default apps",
-        ["settingsHint"] = "Windows Settings will open.",
-        ["technicalDetails"] = "Technical details",
-        ["noDefaultApp"] = "No default app",
-        ["noAppSet"] = "No app set",
-        ["allSet"] = "All set",
-        ["oneException"] = "1 exception",
-        ["exceptionsCount"] = "{count} exceptions",
-        ["readingDefaultsTitle"] = "Reading defaults",
-        ["readingDefaultsBody"] = "Checking the apps Windows uses for your files.",
-        ["loadFailedTitle"] = "Could not read defaults",
-        ["exportToast"] = "Exported {count} file associations.",
-        ["importedSummary"] = "{count} imported associations compared with this PC.",
-        ["snapshotComparison"] = "Snapshot comparison",
-        ["current"] = "Current",
-        ["none"] = "none",
-        ["changed"] = "Changed",
-        ["setAsDefault"] = "Set as default",
-        ["confirmSetDefault"] = "Set {app} as the default app for {extension}? This will immediately change your Windows default app setting.",
-        ["setDefaultToast"] = "{extension} now opens with {app}.",
-        ["openSettings"] = "Open settings",
-        ["export"] = "Export"
-    };
-
-    private static readonly Dictionary<string, string> Zh = new()
-    {
-        ["appTagline"] = "为文件类型选择打开应用。",
-        ["searchPlaceholder"] = "搜索文件或应用",
-        ["refresh"] = "刷新",
-        ["compare"] = "对比",
-        ["fileKinds"] = "文件类型",
-        ["emptyNoMatch"] = "没有匹配的文件类型。",
-        ["all"] = "全部",
-        ["needsReview"] = "需检查",
-        ["noFileKindSelected"] = "未选择文件类型",
-        ["pickFileKind"] = "选择一种文件类型，查看当前打开应用。",
-        ["fileKind"] = "文件类型",
-        ["format"] = "格式",
-        ["backToFileKind"] = "返回",
-        ["currentApp"] = "当前使用",
-        ["recommendedApps"] = "推荐应用",
-        ["recommended"] = "推荐",
-        ["availableApp"] = "可用",
-        ["knownForFormat"] = "适合此格式",
-        ["usedBefore"] = "曾经使用",
-        ["loadingApps"] = "正在查找适合此格式的应用。",
-        ["noCandidateApps"] = "没有找到候选应用。",
-        ["changeInWindows"] = "在 Windows 中更改",
-        ["openAppDefaults"] = "打开应用默认设置",
-        ["formatSettingsHint"] = "Windows 会让你为 {extension} 选择 {app}。",
-        ["appDefaultsHint"] = "Windows 会打开 {app} 的默认应用页面，请在其中找到 {extension} 并确认选择。",
-        ["includedFormats"] = "包含格式",
-        ["exceptions"] = "例外",
-        ["chooseApp"] = "选择应用",
-        ["openDefaultApps"] = "默认应用",
-        ["settingsHint"] = "将打开 Windows 设置。",
-        ["technicalDetails"] = "技术明细",
-        ["noDefaultApp"] = "未设置默认应用",
-        ["noAppSet"] = "未设置",
-        ["allSet"] = "已设置",
-        ["oneException"] = "1 个例外",
-        ["exceptionsCount"] = "{count} 个例外",
-        ["readingDefaultsTitle"] = "正在读取默认项",
-        ["readingDefaultsBody"] = "正在检查 Windows 用哪些应用打开你的文件。",
-        ["loadFailedTitle"] = "无法读取默认项",
-        ["exportToast"] = "已导出 {count} 个文件关联。",
-        ["importedSummary"] = "已将 {count} 个导入关联与本机对比。",
-        ["snapshotComparison"] = "快照对比",
-        ["current"] = "当前",
-        ["none"] = "无",
-        ["changed"] = "已改变",
-        ["setAsDefault"] = "设为默认",
-        ["confirmSetDefault"] = "要将 {extension} 的默认打开应用改为 {app} 吗？此操作会立即修改 Windows 默认应用设置。",
-        ["setDefaultToast"] = "{extension} 现在将使用 {app} 打开。",
-        ["openSettings"] = "打开设置",
-        ["export"] = "导出"
-    };
 }

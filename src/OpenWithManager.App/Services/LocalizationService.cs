@@ -1,0 +1,133 @@
+namespace OpenWithManager.App.Services;
+
+public sealed class LocalizationService
+{
+    private static readonly Dictionary<string, string> En = new()
+    {
+        ["appTagline"] = "Choose apps for file kinds.",
+        ["searchPlaceholder"] = "Search files or apps",
+        ["refresh"] = "Refresh",
+        ["compare"] = "Compare",
+        ["fileKinds"] = "File kinds",
+        ["emptyNoMatch"] = "No matching file kinds.",
+        ["all"] = "All",
+        ["needsReview"] = "Needs review",
+        ["noFileKindSelected"] = "No file kind selected",
+        ["pickFileKind"] = "Pick a file kind to see its current app.",
+        ["fileKind"] = "File kind",
+        ["format"] = "Format",
+        ["backToFileKind"] = "Back",
+        ["currentApp"] = "Current app",
+        ["recommendedApps"] = "Recommended apps",
+        ["recommended"] = "Recommended",
+        ["availableApp"] = "Available",
+        ["knownForFormat"] = "Known for this format",
+        ["usedBefore"] = "Used before",
+        ["loadingApps"] = "Finding apps for this format.",
+        ["noCandidateApps"] = "No candidate apps found.",
+        ["changeInWindows"] = "Change in Windows",
+        ["openAppDefaults"] = "Open app defaults",
+        ["formatSettingsHint"] = "Windows will ask you to choose {app} for {extension}.",
+        ["appDefaultsHint"] = "Windows will open {app}'s default app page. Find {extension} there and confirm your choice.",
+        ["includedFormats"] = "Included formats",
+        ["exceptions"] = "Exceptions",
+        ["chooseApp"] = "Choose app",
+        ["openDefaultApps"] = "Open default apps",
+        ["settingsHint"] = "Windows Settings will open.",
+        ["technicalDetails"] = "Technical details",
+        ["noDefaultApp"] = "No default app",
+        ["noAppSet"] = "No app set",
+        ["allSet"] = "All set",
+        ["oneException"] = "1 exception",
+        ["exceptionsCount"] = "{count} exceptions",
+        ["readingDefaultsTitle"] = "Reading defaults",
+        ["readingDefaultsBody"] = "Checking the apps Windows uses for your files.",
+        ["loadFailedTitle"] = "Could not read defaults",
+        ["exportToast"] = "Exported {count} file associations.",
+        ["importedSummary"] = "{count} imported associations compared with this PC.",
+        ["snapshotComparison"] = "Snapshot comparison",
+        ["current"] = "Current",
+        ["none"] = "none",
+        ["changed"] = "Changed",
+        ["setAsDefault"] = "Set as default",
+        ["confirmSetDefault"] = "Set {app} as the default app for {extension}? This will immediately change your Windows default app setting.",
+        ["setDefaultToast"] = "{extension} now opens with {app}.",
+        ["openSettings"] = "Open settings",
+        ["export"] = "Export"
+    };
+
+    private static readonly Dictionary<string, string> Zh = new()
+    {
+        ["appTagline"] = "为文件类型选择打开应用。",
+        ["searchPlaceholder"] = "搜索文件或应用",
+        ["refresh"] = "刷新",
+        ["compare"] = "对比",
+        ["fileKinds"] = "文件类型",
+        ["emptyNoMatch"] = "没有匹配的文件类型。",
+        ["all"] = "全部",
+        ["needsReview"] = "需检查",
+        ["noFileKindSelected"] = "未选择文件类型",
+        ["pickFileKind"] = "选择一种文件类型，查看当前打开应用。",
+        ["fileKind"] = "文件类型",
+        ["format"] = "格式",
+        ["backToFileKind"] = "返回",
+        ["currentApp"] = "当前使用",
+        ["recommendedApps"] = "推荐应用",
+        ["recommended"] = "推荐",
+        ["availableApp"] = "可用",
+        ["knownForFormat"] = "适合此格式",
+        ["usedBefore"] = "曾经使用",
+        ["loadingApps"] = "正在查找适合此格式的应用。",
+        ["noCandidateApps"] = "没有找到候选应用。",
+        ["changeInWindows"] = "在 Windows 中更改",
+        ["openAppDefaults"] = "打开应用默认设置",
+        ["formatSettingsHint"] = "Windows 会让你为 {extension} 选择 {app}。",
+        ["appDefaultsHint"] = "Windows 会打开 {app} 的默认应用页面，请在其中找到 {extension} 并确认选择。",
+        ["includedFormats"] = "包含格式",
+        ["exceptions"] = "例外",
+        ["chooseApp"] = "选择应用",
+        ["openDefaultApps"] = "默认应用",
+        ["settingsHint"] = "将打开 Windows 设置。",
+        ["technicalDetails"] = "技术明细",
+        ["noDefaultApp"] = "未设置默认应用",
+        ["noAppSet"] = "未设置",
+        ["allSet"] = "已设置",
+        ["oneException"] = "1 个例外",
+        ["exceptionsCount"] = "{count} 个例外",
+        ["readingDefaultsTitle"] = "正在读取默认项",
+        ["readingDefaultsBody"] = "正在检查 Windows 用哪些应用打开你的文件。",
+        ["loadFailedTitle"] = "无法读取默认项",
+        ["exportToast"] = "已导出 {count} 个文件关联。",
+        ["importedSummary"] = "已将 {count} 个导入关联与本机对比。",
+        ["snapshotComparison"] = "快照对比",
+        ["current"] = "当前",
+        ["none"] = "无",
+        ["changed"] = "已改变",
+        ["setAsDefault"] = "设为默认",
+        ["confirmSetDefault"] = "要将 {extension} 的默认打开应用改为 {app} 吗？此操作会立即修改 Windows 默认应用设置。",
+        ["setDefaultToast"] = "{extension} 现在将使用 {app} 打开。",
+        ["openSettings"] = "打开设置",
+        ["export"] = "导出"
+    };
+
+    public bool IsChinese { get; private set; } = true;
+
+    public string LanguageLabel => IsChinese ? "中" : "EN";
+
+    public void ToggleLanguage()
+    {
+        IsChinese = !IsChinese;
+    }
+
+    public string T(string key, params (string Key, string Value)[] values)
+    {
+        var dictionary = IsChinese ? Zh : En;
+        var text = dictionary.TryGetValue(key, out var template) ? template : key;
+        foreach (var (name, replacement) in values)
+        {
+            text = text.Replace($"{{{name}}}", replacement);
+        }
+
+        return text;
+    }
+}

@@ -1,9 +1,5 @@
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows;
-using System.Windows.Interop;
-using System.Windows.Media.Imaging;
 using OpenWithManager.App.Models;
 using Microsoft.Win32;
 
@@ -57,7 +53,6 @@ public sealed class FileAssociationService
                     extension.Description,
                     progId,
                     ReadFriendlyName(progId),
-                    null,
                     userChoice is not null ? "UserChoice" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
@@ -115,158 +110,12 @@ public sealed class FileAssociationService
         return result >= 0 && buffer.Length > 0 ? buffer.ToString() : value;
     }
 
-    public static string? ReadIconDataUrl(string? progId)
-    {
-        var iconPath = ReadOpenCommandPath(progId) ?? ReadIconPath(progId);
-        return ReadFileIconDataUrl(iconPath);
-    }
-
-    public static string? ReadFileIconDataUrl(string? iconPath)
-    {
-        if (string.IsNullOrWhiteSpace(iconPath))
-        {
-            return null;
-        }
-
-        try
-        {
-            var filePath = NormalizeResourcePath(iconPath);
-            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
-            {
-                return null;
-            }
-
-            var iconHandle = GetLargeIconHandle(filePath);
-            if (iconHandle == IntPtr.Zero)
-            {
-                return null;
-            }
-
-            try
-            {
-                var source = Imaging.CreateBitmapSourceFromHIcon(
-                    iconHandle,
-                    Int32Rect.Empty,
-                    BitmapSizeOptions.FromWidthAndHeight(32, 32));
-
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(source));
-
-                using var stream = new MemoryStream();
-                encoder.Save(stream);
-                return $"data:image/png;base64,{Convert.ToBase64String(stream.ToArray())}";
-            }
-            finally
-            {
-                DestroyIcon(iconHandle);
-            }
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static string? ReadIconPath(string? progId)
-    {
-        if (string.IsNullOrWhiteSpace(progId))
-        {
-            return null;
-        }
-
-        using var key = Registry.ClassesRoot.OpenSubKey($@"{progId}\DefaultIcon");
-        return key?.GetValue(null) as string;
-    }
-
-    private static string? ReadOpenCommandPath(string? progId)
-    {
-        if (string.IsNullOrWhiteSpace(progId))
-        {
-            return null;
-        }
-
-        using var key = Registry.ClassesRoot.OpenSubKey($@"{progId}\shell\open\command");
-        return key?.GetValue(null) as string;
-    }
-
-    private static string? NormalizeResourcePath(string value)
-    {
-        var path = Environment.ExpandEnvironmentVariables(value.Trim());
-        if (path.StartsWith('"'))
-        {
-            var endQuote = path.IndexOf('"', 1);
-            if (endQuote > 1)
-            {
-                path = path[1..endQuote];
-            }
-        }
-        else
-        {
-            var commaIndex = path.IndexOf(',');
-            if (commaIndex > 0)
-            {
-                path = path[..commaIndex];
-            }
-
-            var exeIndex = path.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
-            if (exeIndex > 0)
-            {
-                path = path[..(exeIndex + 4)];
-            }
-        }
-
-        return path.Trim().Trim('"');
-    }
-
-    private static IntPtr GetLargeIconHandle(string filePath)
-    {
-        var info = new ShFileInfo();
-        var result = SHGetFileInfo(
-            filePath,
-            0,
-            ref info,
-            (uint)Marshal.SizeOf<ShFileInfo>(),
-            ShGetFileInfoFlags.Icon | ShGetFileInfoFlags.LargeIcon);
-
-        return result == IntPtr.Zero ? IntPtr.Zero : info.IconHandle;
-    }
-
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr SHGetFileInfo(
-        string path,
-        uint fileAttributes,
-        ref ShFileInfo fileInfo,
-        uint fileInfoSize,
-        ShGetFileInfoFlags flags);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool DestroyIcon(IntPtr icon);
-
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     private static extern int SHLoadIndirectString(
         string source,
         StringBuilder output,
         uint outputLength,
         IntPtr reserved);
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct ShFileInfo
-    {
-        public IntPtr IconHandle;
-        public int IconIndex;
-        public uint Attributes;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string DisplayName;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
-        public string TypeName;
-    }
-
-    [Flags]
-    private enum ShGetFileInfoFlags : uint
-    {
-        Icon = 0x000000100,
-        LargeIcon = 0x000000000
-    }
 
     private sealed record KnownExtension(string Extension, string Category, string Description);
 }

@@ -27,14 +27,13 @@ public sealed class FormatCandidateService
             candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,
                 currentItem.ProgId,
-                currentItem.IconDataUrl,
                 "Current",
                 true));
         }
 
         candidates.AddRange(_shellAssociations.GetHandlers(normalizedExtension));
         candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem?.ProgId));
-        candidates.AddRange(ReadOpenWithList(normalizedExtension, currentItem?.ProgId));
+        candidates.AddRange(ReadOpenWithList(normalizedExtension));
         candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem?.ProgId));
 
         var distinctCandidates = candidates
@@ -88,13 +87,12 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
-                FileAssociationService.ReadIconDataUrl(progId),
                 "OpenWithProgids",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
         }
     }
 
-    private static IEnumerable<FormatAppCandidate> ReadOpenWithList(string extension, string? currentProgId)
+    private static IEnumerable<FormatAppCandidate> ReadOpenWithList(string extension)
     {
         using var key = Registry.CurrentUser.OpenSubKey(
             $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithList");
@@ -113,7 +111,7 @@ public sealed class FormatCandidateService
             }
 
             var appName = ReadApplicationName(executableName) ?? executableName;
-            yield return new FormatAppCandidate(appName, null, null, "OpenWithList", false);
+            yield return new FormatAppCandidate(appName, null, "OpenWithList", false);
         }
     }
 
@@ -165,7 +163,6 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
-                FileAssociationService.ReadIconDataUrl(progId),
                 "RegisteredApplication",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase),
                 settingsParameterName,
