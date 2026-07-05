@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using OpenWithManager.App.Models;
@@ -49,8 +51,7 @@ public sealed class FileAssociationService
                 var progId = userChoice ?? shellProgId ?? fallback;
                 var appName = progId is null
                     ? null
-                    : ReadAssociationString(extension.Extension, AssocString.FriendlyAppName)
-                        ?? ReadFriendlyName(progId);
+                    : ReadDisplayAppName(extension.Extension, extension.Description, progId);
 
                 return new FileAssociationItem(
                     extension.Extension,
@@ -122,6 +123,71 @@ public sealed class FileAssociationService
         var buffer = new StringBuilder((int)length);
         var result = AssocQueryString(AssocFlags.None, value, extension, null, buffer, ref length);
         return result >= 0 && buffer.Length > 0 ? ResolveDisplayName(buffer.ToString()) : null;
+    }
+
+    private static string? ReadDisplayAppName(string extension, string description, string progId)
+    {
+        var documentName = ReadAssociationString(extension, AssocString.FriendlyDocName);
+        return FirstAppLikeName(ReadAssociationString(extension, AssocString.FriendlyAppName), documentName, description)
+            ?? ReadExecutableDisplayName(ReadAssociationString(extension, AssocString.Executable))
+            ?? FirstAppLikeName(ReadFriendlyName(progId), documentName, description);
+    }
+
+    private static string? FirstAppLikeName(string? value, string? documentName, string description)
+    {
+        if (string.IsNullOrWhiteSpace(value) || IsDocumentName(value, documentName, description) || IsPlaceholderAppName(value))
+        {
+            return null;
+        }
+
+        return value;
+    }
+
+    private static bool IsDocumentName(string value, string? documentName, string description)
+    {
+        var candidate = NormalizeName(value);
+        return candidate == NormalizeName(documentName)
+            || candidate == NormalizeName(description);
+    }
+
+    private static bool IsPlaceholderAppName(string value)
+    {
+        var normalized = NormalizeName(value);
+        return normalized is "chooseanapp" or "selectanapp" or "chooseapp" or "选取应用" or "选择应用";
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var normalized = new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        return normalized.EndsWith('s') ? normalized[..^1] : normalized;
+    }
+
+    private static string? ReadExecutableDisplayName(string? executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var info = FileVersionInfo.GetVersionInfo(executablePath);
+            return FirstNonEmpty(info.FileDescription, info.ProductName, Path.GetFileNameWithoutExtension(executablePath));
+        }
+        catch
+        {
+            return Path.GetFileNameWithoutExtension(executablePath);
+        }
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     public static AppIconLocation? ReadIconLocation(string? progId)
@@ -252,6 +318,8 @@ public sealed class FileAssociationService
 
     private enum AssocString
     {
+        Executable = 2,
+        FriendlyDocName = 3,
         FriendlyAppName = 4,
         ProgId = 20
     }
