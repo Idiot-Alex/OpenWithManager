@@ -19,12 +19,14 @@ public partial class MainWindow : Window
     private readonly LocalizationService _text = new();
     private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
+    private readonly AppPreferences _preferences = AppPreferencesService.Load();
     private readonly ObservableCollection<FileKindListItem> _visibleKinds = [];
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _refreshOnNextActivation;
 
     public MainWindow()
     {
+        _text.SetLanguage(_preferences.IsChinese);
         _fileKinds = new FileKindService(_fileAssociations);
         _formatCandidates = new FormatCandidateService(_fileAssociations, _shellAssociations);
         InitializeComponent();
@@ -45,7 +47,9 @@ public partial class MainWindow : Window
 
         try
         {
-            var kinds = await Task.Run(_fileKinds.GetFileKinds);
+            var useDeveloperFormatView = _preferences.UseDeveloperFormatView;
+            _fileAssociations.UseDeveloperFormatView = useDeveloperFormatView;
+            var kinds = await Task.Run(() => _fileKinds.GetFileKinds(useDeveloperFormatView));
             _state.AllKinds = kinds;
             _state.SelectedKind = _state.SelectedKind is null
                 ? _state.AllKinds.FirstOrDefault()
@@ -386,6 +390,7 @@ public partial class MainWindow : Window
         var source = new Border
         {
             Padding = new Thickness(8, 4, 8, 4),
+            Visibility = _preferences.ShowCandidateSources ? Visibility.Visible : Visibility.Collapsed,
             Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
             BorderThickness = new Thickness(1),
@@ -492,13 +497,13 @@ public partial class MainWindow : Window
     private async Task OpenDefaultSettingsAsync()
     {
         await Task.Run(() => _settings.OpenDefaultApps());
-        _refreshOnNextActivation = true;
+        _refreshOnNextActivation = _preferences.AutoRefreshAfterSettings;
     }
 
     private async Task OpenFormatSettingsAsync(string extension, FormatAppCandidate? candidate)
     {
         await Task.Run(() => _settings.OpenDefaultApps(candidate?.SettingsParameterName, candidate?.SettingsParameterValue));
-        _refreshOnNextActivation = true;
+        _refreshOnNextActivation = _preferences.AutoRefreshAfterSettings;
         ShowToast(FormatSettingsHint(extension, candidate));
     }
 
@@ -530,6 +535,7 @@ public partial class MainWindow : Window
         var expander = new Expander
         {
             Header = t("technicalDetails"),
+            IsExpanded = _preferences.ShowTechnicalDetails,
             Margin = new Thickness(0, 20, 0, 0),
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
         };
@@ -917,7 +923,62 @@ public partial class MainWindow : Window
     private void OnLanguageClicked(object sender, RoutedEventArgs e)
     {
         _text.ToggleLanguage();
+        _preferences.IsChinese = _text.IsChinese;
+        SavePreferences();
         ApplyFilter();
+    }
+
+    private void OnPreferencesClicked(object sender, RoutedEventArgs e)
+    {
+        SyncPreferencesPanel();
+        PreferencesPanel.Visibility = Visibility.Visible;
+    }
+
+    private void OnClosePreferencesClicked(object sender, RoutedEventArgs e)
+    {
+        PreferencesPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void OnSettingsLanguageClicked(object sender, RoutedEventArgs e)
+    {
+        _text.ToggleLanguage();
+        _preferences.IsChinese = _text.IsChinese;
+        SavePreferences();
+        ApplyFilter();
+        SyncPreferencesPanel();
+    }
+
+    private async void OnDeveloperViewClicked(object sender, RoutedEventArgs e)
+    {
+        _preferences.UseDeveloperFormatView = DeveloperViewCheckBox.IsChecked == true;
+        SavePreferences();
+        _state.SelectedFormat = null;
+        _state.SelectedCandidate = null;
+        await LoadFileKindsAsync();
+        SyncPreferencesPanel();
+    }
+
+    private void OnShowTechnicalDetailsClicked(object sender, RoutedEventArgs e)
+    {
+        _preferences.ShowTechnicalDetails = ShowTechnicalDetailsCheckBox.IsChecked == true;
+        SavePreferences();
+        RenderDetail();
+        SyncPreferencesPanel();
+    }
+
+    private void OnCandidateSourcesClicked(object sender, RoutedEventArgs e)
+    {
+        _preferences.ShowCandidateSources = CandidateSourcesCheckBox.IsChecked == true;
+        SavePreferences();
+        RenderDetail();
+        SyncPreferencesPanel();
+    }
+
+    private void OnAutoRefreshClicked(object sender, RoutedEventArgs e)
+    {
+        _preferences.AutoRefreshAfterSettings = AutoRefreshCheckBox.IsChecked == true;
+        SavePreferences();
+        SyncPreferencesPanel();
     }
 
     private async void OnOpenSettingsClicked(object sender, RoutedEventArgs e)
@@ -936,7 +997,34 @@ public partial class MainWindow : Window
         SearchBox.ToolTip = t("searchPlaceholder");
         LanguageButton.Content = _text.LanguageLabel;
         RefreshButton.Content = t("refresh");
-        SettingsButton.Content = t("openSettings");
+        PreferencesButton.Content = t("preferences");
+        SettingsButton.Content = t("windowsSettings");
         FileKindsLabel.Text = t("fileKinds");
+        SyncPreferencesPanel();
+    }
+
+    private void SyncPreferencesPanel()
+    {
+        PreferencesTitle.Text = t("preferences");
+        PreferencesSubtitle.Text = t("preferencesSubtitle");
+        ClosePreferencesButton.Content = t("close");
+        PreferencesDisplayLabel.Text = t("preferencesDisplay");
+        SettingsLanguageButton.Content = t("languageSetting", ("language", _text.LanguageLabel));
+        DeveloperViewCheckBox.Content = t("developerFormatView");
+        DeveloperViewCheckBox.IsChecked = _preferences.UseDeveloperFormatView;
+        ShowTechnicalDetailsCheckBox.Content = t("showTechnicalDetails");
+        ShowTechnicalDetailsCheckBox.IsChecked = _preferences.ShowTechnicalDetails;
+        CandidateSourcesCheckBox.Content = t("showCandidateSources");
+        CandidateSourcesCheckBox.IsChecked = _preferences.ShowCandidateSources;
+        PreferencesBehaviorLabel.Text = t("preferencesBehavior");
+        AutoRefreshCheckBox.Content = t("autoRefreshAfterSettings");
+        AutoRefreshCheckBox.IsChecked = _preferences.AutoRefreshAfterSettings;
+        PreferencesSafetyLabel.Text = t("preferencesSafety");
+        PreferencesSafetyText.Text = t("preferencesSafetyBody");
+    }
+
+    private void SavePreferences()
+    {
+        AppPreferencesService.Save(_preferences);
     }
 }

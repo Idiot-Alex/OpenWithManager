@@ -58,6 +58,19 @@ public sealed class LocalizationService
         ["loadFailedTitle"] = "Could not read defaults",
         ["current"] = "Current",
         ["none"] = "none",
+        ["preferences"] = "Preferences",
+        ["preferencesSubtitle"] = "Display and behavior options.",
+        ["close"] = "Close",
+        ["preferencesDisplay"] = "Display",
+        ["preferencesBehavior"] = "Behavior",
+        ["preferencesSafety"] = "Safety",
+        ["languageSetting"] = "Language · {language}",
+        ["developerFormatView"] = "Developer format view (.ts as TypeScript)",
+        ["showTechnicalDetails"] = "Show technical details by default",
+        ["showCandidateSources"] = "Show candidate source labels",
+        ["autoRefreshAfterSettings"] = "Refresh after returning from Windows Settings",
+        ["preferencesSafetyBody"] = "OpenWith Manager reads default app associations and opens official Windows Settings pages. It does not write registry defaults or bypass Windows default-app protection.",
+        ["windowsSettings"] = "Windows settings",
         ["openSettings"] = "Open settings"
     };
 
@@ -117,12 +130,30 @@ public sealed class LocalizationService
         ["loadFailedTitle"] = "无法读取默认项",
         ["current"] = "当前",
         ["none"] = "无",
+        ["preferences"] = "偏好设置",
+        ["preferencesSubtitle"] = "显示和行为选项。",
+        ["close"] = "关闭",
+        ["preferencesDisplay"] = "显示",
+        ["preferencesBehavior"] = "行为",
+        ["preferencesSafety"] = "安全",
+        ["languageSetting"] = "语言 · {language}",
+        ["developerFormatView"] = "开发者格式视角（.ts 作为 TypeScript）",
+        ["showTechnicalDetails"] = "默认展开技术明细",
+        ["showCandidateSources"] = "显示候选来源标签",
+        ["autoRefreshAfterSettings"] = "从 Windows 设置返回后刷新",
+        ["preferencesSafetyBody"] = "OpenWith Manager 只读取默认应用关联，并打开官方 Windows 设置页面。它不会写入注册表默认项，也不会绕过 Windows 默认应用保护。",
+        ["windowsSettings"] = "Windows 设置",
         ["openSettings"] = "打开设置"
     };
 
     public bool IsChinese { get; private set; } = true;
 
     public string LanguageLabel => IsChinese ? "中" : "EN";
+
+    public void SetLanguage(bool isChinese)
+    {
+        IsChinese = isChinese;
+    }
 
     public void ToggleLanguage()
     {

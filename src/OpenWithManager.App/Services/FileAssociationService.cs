@@ -9,7 +9,7 @@ namespace OpenWithManager.App.Services;
 
 public sealed class FileAssociationService
 {
-    private static readonly KnownExtension[] KnownExtensions =
+    private static readonly KnownExtension[] BaseKnownExtensions =
     [
         new(".pdf", "Document", "PDF document"),
         new(".txt", "Document", "Plain text"),
@@ -28,7 +28,6 @@ public sealed class FileAssociationService
         new(".mp4", "Video", "MP4 video"),
         new(".mov", "Video", "QuickTime video"),
         new(".mkv", "Video", "Matroska video"),
-        new(".ts", "Video", "MPEG transport stream video"),
         new(".zip", "Archive", "ZIP archive"),
         new(".rar", "Archive", "RAR archive"),
         new(".7z", "Archive", "7-Zip archive"),
@@ -40,9 +39,11 @@ public sealed class FileAssociationService
         new(".py", "Code", "Python source file")
     ];
 
+    public bool UseDeveloperFormatView { get; set; }
+
     public List<FileAssociationItem> GetKnownAssociations()
     {
-        return KnownExtensions
+        return GetKnownExtensions()
             .Select(extension =>
             {
                 var userChoice = ReadUserChoice(extension.Extension);
@@ -65,6 +66,18 @@ public sealed class FileAssociationService
             .OrderBy(item => item.Category)
             .ThenBy(item => item.Extension)
             .ToList();
+    }
+
+    private IEnumerable<KnownExtension> GetKnownExtensions()
+    {
+        foreach (var extension in BaseKnownExtensions)
+        {
+            yield return extension;
+        }
+
+        yield return UseDeveloperFormatView
+            ? new KnownExtension(".ts", "Code", "TypeScript file")
+            : new KnownExtension(".ts", "Video", "MPEG transport stream video");
     }
 
     private static string? ReadUserChoice(string extension)

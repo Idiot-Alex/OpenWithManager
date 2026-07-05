@@ -6,8 +6,17 @@ public sealed class FileKindService
 {
     private readonly FileAssociationService _fileAssociations;
 
-    private static readonly FileKindProfile[] Profiles =
-    [
+    private static FileKindProfile[] GetProfiles(bool useDeveloperFormatView)
+    {
+        var videoExtensions = useDeveloperFormatView
+            ? new[] { ".mp4", ".mov", ".mkv" }
+            : new[] { ".mp4", ".mov", ".mkv", ".ts" };
+        var codeExtensions = useDeveloperFormatView
+            ? new[] { ".json", ".js", ".ts", ".cs", ".py" }
+            : new[] { ".json", ".js", ".cs", ".py" };
+
+        return
+        [
         new(
             "images",
             "Photos and images",
@@ -19,7 +28,7 @@ public sealed class FileKindService
             "Videos",
             "Videos",
             "Movies, clips, and screen recordings.",
-            [".mp4", ".mov", ".mkv", ".ts"]),
+            videoExtensions),
         new(
             "music",
             "Music and audio",
@@ -67,26 +76,27 @@ public sealed class FileKindService
             "Code files",
             "Code",
             "Developer files that usually open in an editor.",
-            [".json", ".js", ".cs", ".py"]),
+            codeExtensions),
         new(
             "web",
             "Web pages",
             "Web",
             "HTML files and pages saved from the web.",
             [".html", ".htm"])
-    ];
+        ];
+    }
 
     public FileKindService(FileAssociationService fileAssociations)
     {
         _fileAssociations = fileAssociations;
     }
 
-    public List<FileKindSummary> GetFileKinds()
+    public List<FileKindSummary> GetFileKinds(bool useDeveloperFormatView)
     {
         var associations = _fileAssociations.GetKnownAssociations();
         var byExtension = associations.ToDictionary(item => item.Extension, StringComparer.OrdinalIgnoreCase);
 
-        return Profiles
+        return GetProfiles(useDeveloperFormatView)
             .Select(profile => BuildSummary(profile, byExtension))
             .OrderBy(StatusPriority)
             .ThenBy(summary => summary.DisplayName)

@@ -55,6 +55,7 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="LanguageButton" Style="{StaticResource IconButton}" Content="中" Click="OnLanguageClicked" />
                 <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Content="Refresh" Click="OnRefreshClicked" />
+                <Button x:Name="PreferencesButton" Style="{StaticResource IconButton}" Content="Preferences" Click="OnPreferencesClicked" />
                 <Button x:Name="SettingsButton" Style="{StaticResource PrimaryButton}" Content="Open settings" Click="OnOpenSettingsClicked" />
             </StackPanel>
         </Grid>
@@ -240,6 +241,7 @@
 
         <Border x:Name="ToastBorder"
                 Grid.RowSpan="3"
+                Panel.ZIndex="30"
                 Visibility="Collapsed"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
@@ -253,6 +255,90 @@
             <TextBlock x:Name="ToastText"
                        Foreground="{StaticResource SurfaceBrush}"
                        TextWrapping="Wrap" />
+        </Border>
+
+        <Border x:Name="PreferencesPanel"
+                Grid.RowSpan="3"
+                Panel.ZIndex="20"
+                Visibility="Collapsed"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Width="380"
+                Padding="22"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+            <DockPanel LastChildFill="True">
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="PreferencesTitle"
+                                   Text="Preferences"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock x:Name="PreferencesSubtitle"
+                                   Text="Display and behavior options."
+                                   Margin="0,4,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Button x:Name="ClosePreferencesButton"
+                            Grid.Column="1"
+                            Style="{StaticResource IconButton}"
+                            Content="Close"
+                            Click="OnClosePreferencesClicked" />
+                </Grid>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock x:Name="PreferencesDisplayLabel"
+                                   Text="Display"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,10" />
+                        <Button x:Name="SettingsLanguageButton"
+                                Style="{StaticResource IconButton}"
+                                HorizontalContentAlignment="Left"
+                                Margin="0,0,0,10"
+                                Click="OnSettingsLanguageClicked" />
+                        <CheckBox x:Name="DeveloperViewCheckBox"
+                                  Margin="0,0,0,10"
+                                  Click="OnDeveloperViewClicked" />
+                        <CheckBox x:Name="ShowTechnicalDetailsCheckBox"
+                                  Margin="0,0,0,10"
+                                  Click="OnShowTechnicalDetailsClicked" />
+                        <CheckBox x:Name="CandidateSourcesCheckBox"
+                                  Margin="0,0,0,22"
+                                  Click="OnCandidateSourcesClicked" />
+
+                        <TextBlock x:Name="PreferencesBehaviorLabel"
+                                   Text="Behavior"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,10" />
+                        <CheckBox x:Name="AutoRefreshCheckBox"
+                                  Margin="0,0,0,22"
+                                  Click="OnAutoRefreshClicked" />
+
+                        <TextBlock x:Name="PreferencesSafetyLabel"
+                                   Text="Safety"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,0,0,8" />
+                        <TextBlock x:Name="PreferencesSafetyText"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
         </Border>
     </Grid>
 </Window>
