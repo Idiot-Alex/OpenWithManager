@@ -4,7 +4,7 @@
         Title="OpenWith Manager"
         Width="1180"
         Height="760"
-        MinWidth="980"
+        MinWidth="1040"
         MinHeight="640"
         WindowStartupLocation="CenterScreen"
         Background="#f6f4ee"
@@ -53,7 +53,6 @@
                      TextChanged="OnSearchChanged" />
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="LanguageButton" Style="{StaticResource IconButton}" Content="中" Click="OnLanguageClicked" />
                 <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Content="Refresh" Click="OnRefreshClicked" />
                 <Button x:Name="PreferencesButton" Style="{StaticResource IconButton}" Content="Preferences" Click="OnPreferencesClicked" />
                 <Button x:Name="SettingsButton" Style="{StaticResource PrimaryButton}" Content="Open settings" Click="OnOpenSettingsClicked" />
@@ -231,25 +230,27 @@
                     <Border Grid.Row="1"
                             BorderBrush="{StaticResource LineBrush}"
                             BorderThickness="0,1,0,0">
-                        <Grid Margin="24,18,24,24">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.15*" />
-                                <ColumnDefinition Width="18" />
-                                <ColumnDefinition Width="0.85*" />
-                            </Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
 
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="DetailPanel" />
-                            </ScrollViewer>
-
-                            <Border Grid.Column="2"
+                            <Border Background="{StaticResource HoverBrush}"
                                     BorderBrush="{StaticResource LineBrush}"
-                                    BorderThickness="1,0,0,0"
-                                    Padding="18,0,0,0">
+                                    BorderThickness="0,0,0,1"
+                                    MaxHeight="270"
+                                    Padding="24,18">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <StackPanel x:Name="FormatWorkPanel" />
                                 </ScrollViewer>
                             </Border>
+
+                            <ScrollViewer Grid.Row="1"
+                                          Margin="24,18,24,24"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="DetailPanel" />
+                            </ScrollViewer>
                         </Grid>
                     </Border>
                 </Grid>
@@ -326,15 +327,30 @@
                             <Button x:Name="SettingsLanguageButton"
                                     Style="{StaticResource IconButton}"
                                     HorizontalContentAlignment="Left"
-                                    Margin="0,0,0,10"
+                                    Margin="0,0,0,14"
                                     Click="OnSettingsLanguageClicked" />
-                            <CheckBox x:Name="DeveloperViewCheckBox"
-                                      Margin="0,0,0,10"
-                                      Click="OnDeveloperViewClicked" />
+                            <TextBlock x:Name="FormatViewLabel"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Margin="0,0,0,4" />
+                            <TextBlock x:Name="FormatViewHint"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <Button x:Name="WindowsFormatButton"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Click="OnWindowsFormatViewClicked" />
+                                <Button x:Name="DeveloperFormatButton"
+                                        Style="{StaticResource IconButton}"
+                                        Click="OnDeveloperFormatViewClicked" />
+                            </StackPanel>
                             <CheckBox x:Name="ShowTechnicalDetailsCheckBox"
+                                      Style="{StaticResource AppCheckBox}"
                                       Margin="0,0,0,10"
                                       Click="OnShowTechnicalDetailsClicked" />
                             <CheckBox x:Name="CandidateSourcesCheckBox"
+                                      Style="{StaticResource AppCheckBox}"
                                       Margin="0,0,0,22"
                                       Click="OnCandidateSourcesClicked" />
 
@@ -345,6 +361,7 @@
                                        Foreground="{StaticResource MutedBrush}"
                                        Margin="0,0,0,10" />
                             <CheckBox x:Name="AutoRefreshCheckBox"
+                                      Style="{StaticResource AppCheckBox}"
                                       Margin="0,0,0,22"
                                       Click="OnAutoRefreshClicked" />
 

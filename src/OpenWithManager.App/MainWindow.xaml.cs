@@ -317,37 +317,59 @@ public partial class MainWindow : Window
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        AddWorkSectionLabel(t("selectedFormat"));
-        FormatWorkPanel.Children.Add(new TextBlock
+        AddWorkSectionLabel(t("formatActions"));
+
+        var header = new Grid { Margin = new Thickness(0, 8, 0, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var extensionBadge = new Border
         {
-            Text = FormatExtensionLabel(format.Extension),
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
-            FontSize = 20,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 8, 0, 2)
-        });
-        FormatWorkPanel.Children.Add(new TextBlock
+            Background = new SolidColorBrush(Color.FromRgb(255, 254, 250)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(10, 7, 10, 7),
+            Margin = new Thickness(0, 0, 12, 0),
+            Child = new TextBlock
+            {
+                Text = FormatExtensionLabel(format.Extension),
+                Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold
+            }
+        };
+        header.Children.Add(extensionBadge);
+
+        var titleStack = new StackPanel();
+        titleStack.Children.Add(new TextBlock
         {
             Text = item?.Description ?? format.Description,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 4)
+            TextTrimming = TextTrimming.CharacterEllipsis
         });
-        FormatWorkPanel.Children.Add(new TextBlock
+        titleStack.Children.Add(new TextBlock
         {
             Text = t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))),
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, _state.SelectedCandidate is null ? 12 : 4)
+            Margin = new Thickness(0, 3, 0, 0)
         });
+        Grid.SetColumn(titleStack, 1);
+        header.Children.Add(titleStack);
+        FormatWorkPanel.Children.Add(header);
+
         if (_state.SelectedCandidate is not null)
         {
             FormatWorkPanel.Children.Add(new TextBlock
             {
-                Text = t("targetApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
+                Text = t("selectedApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
                 Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 12)
+                Margin = new Thickness(0, 0, 0, 10)
             });
         }
 
@@ -378,7 +400,7 @@ public partial class MainWindow : Window
 
     private void AddNoFormatSelectedPanel()
     {
-        AddWorkSectionLabel(t("selectedFormat"));
+        AddWorkSectionLabel(t("formatActions"));
         FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = t("pickFormat"),
@@ -391,6 +413,7 @@ public partial class MainWindow : Window
     private Button MakeCandidateButton(FormatAppCandidate candidate)
     {
         var isSelected = candidate == _state.SelectedCandidate;
+        var isCurrent = string.Equals(candidate.Source, "Current", StringComparison.OrdinalIgnoreCase);
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -408,7 +431,7 @@ public partial class MainWindow : Window
         var source = new Border
         {
             Padding = new Thickness(8, 4, 8, 4),
-            Visibility = _preferences.ShowCandidateSources ? Visibility.Visible : Visibility.Collapsed,
+            Visibility = _preferences.ShowCandidateSources || isCurrent ? Visibility.Visible : Visibility.Collapsed,
             Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
             BorderThickness = new Thickness(1),
@@ -976,14 +999,6 @@ public partial class MainWindow : Window
         ApplyFilter();
     }
 
-    private void OnLanguageClicked(object sender, RoutedEventArgs e)
-    {
-        _text.ToggleLanguage();
-        _preferences.IsChinese = _text.IsChinese;
-        SavePreferences();
-        ApplyFilter();
-    }
-
     private void OnPreferencesClicked(object sender, RoutedEventArgs e)
     {
         SyncPreferencesPanel();
@@ -1014,9 +1029,25 @@ public partial class MainWindow : Window
         SyncPreferencesPanel();
     }
 
-    private async void OnDeveloperViewClicked(object sender, RoutedEventArgs e)
+    private async void OnWindowsFormatViewClicked(object sender, RoutedEventArgs e)
     {
-        _preferences.UseDeveloperFormatView = DeveloperViewCheckBox.IsChecked == true;
+        await SetDeveloperFormatViewAsync(false);
+    }
+
+    private async void OnDeveloperFormatViewClicked(object sender, RoutedEventArgs e)
+    {
+        await SetDeveloperFormatViewAsync(true);
+    }
+
+    private async Task SetDeveloperFormatViewAsync(bool enabled)
+    {
+        if (_preferences.UseDeveloperFormatView == enabled)
+        {
+            SyncPreferencesPanel();
+            return;
+        }
+
+        _preferences.UseDeveloperFormatView = enabled;
         SavePreferences();
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
@@ -1061,7 +1092,6 @@ public partial class MainWindow : Window
     {
         TaglineText.Text = t("appTagline");
         SearchBox.ToolTip = t("searchPlaceholder");
-        LanguageButton.Content = _text.LanguageLabel;
         RefreshButton.Content = t("refresh");
         PreferencesButton.Content = t("preferences");
         SettingsButton.Content = t("windowsSettings");
@@ -1076,8 +1106,12 @@ public partial class MainWindow : Window
         ClosePreferencesButton.Content = t("close");
         PreferencesDisplayLabel.Text = t("preferencesDisplay");
         SettingsLanguageButton.Content = t("languageSetting", ("language", _text.LanguageLabel));
-        DeveloperViewCheckBox.Content = t("developerFormatView");
-        DeveloperViewCheckBox.IsChecked = _preferences.UseDeveloperFormatView;
+        FormatViewLabel.Text = t("formatView");
+        FormatViewHint.Text = t("formatViewHint");
+        WindowsFormatButton.Content = t("formatViewWindows");
+        DeveloperFormatButton.Content = t("formatViewDeveloper");
+        WindowsFormatButton.Style = (Style)FindResource(_preferences.UseDeveloperFormatView ? "IconButton" : "PrimaryButton");
+        DeveloperFormatButton.Style = (Style)FindResource(_preferences.UseDeveloperFormatView ? "PrimaryButton" : "IconButton");
         ShowTechnicalDetailsCheckBox.Content = t("showTechnicalDetails");
         ShowTechnicalDetailsCheckBox.IsChecked = _preferences.ShowTechnicalDetails;
         CandidateSourcesCheckBox.Content = t("showCandidateSources");
