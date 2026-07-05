@@ -124,33 +124,42 @@
                         <ScrollBar x:Name="PART_VerticalScrollBar"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Stretch"
-                                   Margin="0,4,2,4"
+                                   Margin="0,4,1,4"
                                    Orientation="Vertical"
                                    Maximum="{TemplateBinding ScrollableHeight}"
                                    Value="{TemplateBinding VerticalOffset}"
                                    ViewportSize="{TemplateBinding ViewportHeight}"
                                    Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
-                                   Opacity="0" />
+                                   Opacity="0"
+                                   IsHitTestVisible="False" />
 
                         <ScrollBar x:Name="PART_HorizontalScrollBar"
                                    HorizontalAlignment="Stretch"
                                    VerticalAlignment="Bottom"
-                                   Margin="4,0,4,2"
+                                   Margin="4,0,4,1"
                                    Orientation="Horizontal"
                                    Maximum="{TemplateBinding ScrollableWidth}"
                                    Value="{TemplateBinding HorizontalOffset}"
                                    ViewportSize="{TemplateBinding ViewportWidth}"
                                    Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
-                                   Opacity="0" />
+                                   Opacity="0"
+                                   IsHitTestVisible="False" />
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger SourceName="PART_VerticalScrollBar" Property="Visibility" Value="Visible">
+                            <Setter TargetName="PART_ScrollContentPresenter" Property="Margin" Value="0,0,12,0" />
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="PART_VerticalScrollBar" Property="Opacity" Value="0.72" />
                             <Setter TargetName="PART_HorizontalScrollBar" Property="Opacity" Value="0.72" />
+                            <Setter TargetName="PART_VerticalScrollBar" Property="IsHitTestVisible" Value="True" />
+                            <Setter TargetName="PART_HorizontalScrollBar" Property="IsHitTestVisible" Value="True" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
                             <Setter TargetName="PART_VerticalScrollBar" Property="Opacity" Value="0.72" />
                             <Setter TargetName="PART_HorizontalScrollBar" Property="Opacity" Value="0.72" />
+                            <Setter TargetName="PART_VerticalScrollBar" Property="IsHitTestVisible" Value="True" />
+                            <Setter TargetName="PART_HorizontalScrollBar" Property="IsHitTestVisible" Value="True" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
