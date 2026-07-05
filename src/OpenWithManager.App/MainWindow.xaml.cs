@@ -99,6 +99,7 @@ public partial class MainWindow : Window
         UpdateStaticText();
         UpdateFilterButtons();
         RenderDetail();
+        _ = SelectFirstFormatIfNeededAsync();
     }
 
     private bool MatchesFilter(FileKindSummary kind)
@@ -295,14 +296,37 @@ public partial class MainWindow : Window
         AddTechnicalItems(_state.SelectedKind.Items);
     }
 
+    private async Task SelectFirstFormatIfNeededAsync()
+    {
+        if (_state.LoadError is not null || _state.SelectedKind is null || _state.SelectedFormat is not null)
+        {
+            return;
+        }
+
+        var firstExtension = _state.SelectedKind.Extensions.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(firstExtension))
+        {
+            return;
+        }
+
+        await SelectFormatAsync(firstExtension);
+    }
+
     private async Task SelectFormatAsync(string extension)
     {
+        var selectedKindId = _state.SelectedKind?.Id;
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
         try
         {
-            _state.SelectedFormat = await Task.Run(() => _formatCandidates.GetCandidates(extension));
-            _state.SelectedCandidate = _state.SelectedFormat.Current ?? _state.SelectedFormat.Candidates.FirstOrDefault();
+            var result = await Task.Run(() => _formatCandidates.GetCandidates(extension));
+            if (_state.SelectedKind?.Id != selectedKindId)
+            {
+                return;
+            }
+
+            _state.SelectedFormat = result;
+            _state.SelectedCandidate = result.Current ?? result.Candidates.FirstOrDefault();
         }
         catch (Exception ex)
         {
@@ -692,7 +716,7 @@ public partial class MainWindow : Window
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         return content;
     }
 
@@ -719,7 +743,6 @@ public partial class MainWindow : Window
         var app = new Grid();
         app.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         app.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        app.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         app.Children.Add(MakeAppIcon(icon, appName, 24, 16, new Thickness(0, 0, 8, 0)));
 
         var appNameText = new TextBlock
@@ -731,21 +754,6 @@ public partial class MainWindow : Window
         };
         Grid.SetColumn(appNameText, 1);
         app.Children.Add(appNameText);
-        if (isSelected)
-        {
-            var selectedLabel = new TextBlock
-            {
-                Text = t("selected"),
-                Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(selectedLabel, 2);
-            app.Children.Add(selectedLabel);
-        }
-
         Grid.SetColumn(descriptionText, 1);
         Grid.SetColumn(app, 2);
         content.Children.Add(code);
@@ -966,6 +974,7 @@ public partial class MainWindow : Window
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
     {
         _state.Query = SearchBox.Text.Trim();
+        UpdateSearchPlaceholder();
         ApplyFilter();
     }
 
@@ -980,6 +989,7 @@ public partial class MainWindow : Window
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
         RenderDetail();
+        _ = SelectFirstFormatIfNeededAsync();
     }
 
     private async void OnRefreshClicked(object sender, RoutedEventArgs e)
@@ -1020,9 +1030,25 @@ public partial class MainWindow : Window
         PreferencesOverlay.Visibility = Visibility.Collapsed;
     }
 
-    private void OnSettingsLanguageClicked(object sender, RoutedEventArgs e)
+    private void OnChineseLanguageClicked(object sender, RoutedEventArgs e)
     {
-        _text.ToggleLanguage();
+        SetLanguage(true);
+    }
+
+    private void OnEnglishLanguageClicked(object sender, RoutedEventArgs e)
+    {
+        SetLanguage(false);
+    }
+
+    private void SetLanguage(bool isChinese)
+    {
+        if (_text.IsChinese == isChinese)
+        {
+            SyncPreferencesPanel();
+            return;
+        }
+
+        _text.SetLanguage(isChinese);
         _preferences.IsChinese = _text.IsChinese;
         SavePreferences();
         ApplyFilter();
@@ -1078,11 +1104,6 @@ public partial class MainWindow : Window
         SyncPreferencesPanel();
     }
 
-    private async void OnOpenSettingsClicked(object sender, RoutedEventArgs e)
-    {
-        await OpenDefaultSettingsAsync();
-    }
-
     private string t(string key, params (string Key, string Value)[] values)
     {
         return _text.T(key, values);
@@ -1092,11 +1113,19 @@ public partial class MainWindow : Window
     {
         TaglineText.Text = t("appTagline");
         SearchBox.ToolTip = t("searchPlaceholder");
+        SearchPlaceholderText.Text = t("searchPlaceholder");
+        UpdateSearchPlaceholder();
         RefreshButton.Content = t("refresh");
         PreferencesButton.Content = t("preferences");
-        SettingsButton.Content = t("windowsSettings");
         FileKindsLabel.Text = t("fileKinds");
         SyncPreferencesPanel();
+    }
+
+    private void UpdateSearchPlaceholder()
+    {
+        SearchPlaceholderText.Visibility = string.IsNullOrWhiteSpace(SearchBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void SyncPreferencesPanel()
@@ -1105,7 +1134,11 @@ public partial class MainWindow : Window
         PreferencesSubtitle.Text = t("preferencesSubtitle");
         ClosePreferencesButton.Content = t("close");
         PreferencesDisplayLabel.Text = t("preferencesDisplay");
-        SettingsLanguageButton.Content = t("languageSetting", ("language", _text.LanguageLabel));
+        LanguageLabel.Text = t("language");
+        ChineseLanguageButton.Content = t("chinese");
+        EnglishLanguageButton.Content = t("english");
+        ChineseLanguageButton.Style = (Style)FindResource(_text.IsChinese ? "PrimaryButton" : "IconButton");
+        EnglishLanguageButton.Style = (Style)FindResource(_text.IsChinese ? "IconButton" : "PrimaryButton");
         FormatViewLabel.Text = t("formatView");
         FormatViewHint.Text = t("formatViewHint");
         WindowsFormatButton.Content = t("formatViewWindows");

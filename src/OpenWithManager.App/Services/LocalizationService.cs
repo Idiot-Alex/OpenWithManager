@@ -17,7 +17,6 @@ public sealed class LocalizationService
         ["format"] = "Format",
         ["currentUsing"] = "Current · {app}",
         ["availableApps"] = "Available apps",
-        ["selected"] = "Selected",
         ["pickFormat"] = "Select a format on the left to see apps and actions here.",
         ["formatTableFormat"] = "Format",
         ["formatTableDescription"] = "Description",
@@ -66,7 +65,9 @@ public sealed class LocalizationService
         ["preferencesDisplay"] = "Display",
         ["preferencesBehavior"] = "Behavior",
         ["preferencesSafety"] = "Safety",
-        ["languageSetting"] = "Language · {language}",
+        ["language"] = "Language",
+        ["chinese"] = "Chinese",
+        ["english"] = "English",
         ["formatView"] = "Format classification",
         ["formatViewHint"] = "Choose how ambiguous extensions such as .TS are grouped.",
         ["formatViewWindows"] = "Windows",
@@ -74,9 +75,7 @@ public sealed class LocalizationService
         ["showTechnicalDetails"] = "Show technical details by default",
         ["showCandidateSources"] = "Show candidate source labels",
         ["autoRefreshAfterSettings"] = "Refresh after returning from Windows Settings",
-        ["preferencesSafetyBody"] = "OpenWith Manager reads default app associations and opens official Windows Settings pages. It does not write registry defaults or bypass Windows default-app protection.",
-        ["windowsSettings"] = "Windows settings",
-        ["openSettings"] = "Open settings"
+        ["preferencesSafetyBody"] = "OpenWith Manager reads default app associations and opens official Windows Settings pages. It does not write registry defaults or bypass Windows default-app protection."
     };
 
     private static readonly Dictionary<string, string> Zh = new()
@@ -94,7 +93,6 @@ public sealed class LocalizationService
         ["format"] = "格式",
         ["currentUsing"] = "当前使用 · {app}",
         ["availableApps"] = "可用应用",
-        ["selected"] = "已选中",
         ["pickFormat"] = "在左侧选择一种格式，这里会显示应用和操作。",
         ["formatTableFormat"] = "格式",
         ["formatTableDescription"] = "说明",
@@ -143,7 +141,9 @@ public sealed class LocalizationService
         ["preferencesDisplay"] = "显示",
         ["preferencesBehavior"] = "行为",
         ["preferencesSafety"] = "安全",
-        ["languageSetting"] = "语言 · {language}",
+        ["language"] = "语言",
+        ["chinese"] = "中文",
+        ["english"] = "English",
         ["formatView"] = "文件格式识别方式",
         ["formatViewHint"] = "决定像 .TS 这类有歧义的扩展名按 Windows 常规用途归类，还是按开发者用途归类。",
         ["formatViewWindows"] = "Windows",
@@ -151,14 +151,10 @@ public sealed class LocalizationService
         ["showTechnicalDetails"] = "默认展开技术明细",
         ["showCandidateSources"] = "显示候选来源标签",
         ["autoRefreshAfterSettings"] = "从 Windows 设置返回后刷新",
-        ["preferencesSafetyBody"] = "OpenWith Manager 只读取默认应用关联，并打开官方 Windows 设置页面。它不会写入注册表默认项，也不会绕过 Windows 默认应用保护。",
-        ["windowsSettings"] = "Windows 设置",
-        ["openSettings"] = "打开设置"
+        ["preferencesSafetyBody"] = "OpenWith Manager 只读取默认应用关联，并打开官方 Windows 设置页面。它不会写入注册表默认项，也不会绕过 Windows 默认应用保护。"
     };
 
     public bool IsChinese { get; private set; } = true;
-
-    public string LanguageLabel => IsChinese ? "中" : "EN";
 
     public void SetLanguage(bool isChinese)
     {

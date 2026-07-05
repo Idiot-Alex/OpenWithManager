@@ -7,7 +7,7 @@
         MinWidth="1040"
         MinHeight="640"
         WindowStartupLocation="CenterScreen"
-        Background="#f6f4ee"
+        Background="#f3f5f7"
         FontFamily="Segoe UI Variable Text, Segoe UI">
     <Grid Margin="24">
         <Grid.RowDefinitions>
@@ -43,19 +43,24 @@
                 </StackPanel>
             </StackPanel>
 
-            <TextBox x:Name="SearchBox"
-                     Grid.Column="1"
-                     Width="320"
-                     Margin="34,0,16,0"
-                     Style="{StaticResource SearchBoxStyle}"
-                     HorizontalAlignment="Right"
-                     VerticalContentAlignment="Center"
-                     TextChanged="OnSearchChanged" />
+            <Grid Grid.Column="1"
+                  Width="320"
+                  Margin="34,0,16,0"
+                  HorizontalAlignment="Right">
+                <TextBox x:Name="SearchBox"
+                         Style="{StaticResource SearchBoxStyle}"
+                         VerticalContentAlignment="Center"
+                         TextChanged="OnSearchChanged" />
+                <TextBlock x:Name="SearchPlaceholderText"
+                           Margin="14,0,0,0"
+                           Foreground="{StaticResource MutedBrush}"
+                           IsHitTestVisible="False"
+                           VerticalAlignment="Center" />
+            </Grid>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="RefreshButton" Style="{StaticResource IconButton}" Content="Refresh" Click="OnRefreshClicked" />
                 <Button x:Name="PreferencesButton" Style="{StaticResource IconButton}" Content="Preferences" Click="OnPreferencesClicked" />
-                <Button x:Name="SettingsButton" Style="{StaticResource PrimaryButton}" Content="Open settings" Click="OnOpenSettingsClicked" />
             </StackPanel>
         </Grid>
 
@@ -230,28 +235,19 @@
                     <Border Grid.Row="1"
                             BorderBrush="{StaticResource LineBrush}"
                             BorderThickness="0,1,0,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-
-                            <Border Background="{StaticResource HoverBrush}"
-                                    BorderBrush="{StaticResource LineBrush}"
-                                    BorderThickness="0,0,0,1"
-                                    MaxHeight="270"
-                                    Padding="24,18">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Background="{StaticResource HoverBrush}"
+                                        BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="24,18">
                                     <StackPanel x:Name="FormatWorkPanel" />
-                                </ScrollViewer>
-                            </Border>
+                                </Border>
 
-                            <ScrollViewer Grid.Row="1"
-                                          Margin="24,18,24,24"
-                                          VerticalScrollBarVisibility="Auto">
-                                <StackPanel x:Name="DetailPanel" />
-                            </ScrollViewer>
-                        </Grid>
+                                <StackPanel x:Name="DetailPanel"
+                                            Margin="24,18,24,24" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </Border>
@@ -324,11 +320,18 @@
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource MutedBrush}"
                                        Margin="0,0,0,10" />
-                            <Button x:Name="SettingsLanguageButton"
-                                    Style="{StaticResource IconButton}"
-                                    HorizontalContentAlignment="Left"
-                                    Margin="0,0,0,14"
-                                    Click="OnSettingsLanguageClicked" />
+                            <TextBlock x:Name="LanguageLabel"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}"
+                                       Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <Button x:Name="ChineseLanguageButton"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Click="OnChineseLanguageClicked" />
+                                <Button x:Name="EnglishLanguageButton"
+                                        Style="{StaticResource IconButton}"
+                                        Click="OnEnglishLanguageClicked" />
+                            </StackPanel>
                             <TextBlock x:Name="FormatViewLabel"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource InkBrush}"
