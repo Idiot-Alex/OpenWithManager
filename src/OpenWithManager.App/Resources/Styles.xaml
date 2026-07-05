@@ -167,6 +167,12 @@
         </Setter>
     </Style>
 
+    <Style x:Key="RightPaneScrollViewer"
+           TargetType="ScrollViewer"
+           BasedOn="{StaticResource {x:Type ScrollViewer}}">
+        <Setter Property="Margin" Value="0,0,-8,0" />
+    </Style>
+
     <Style x:Key="BaseButton" TargetType="Button">
         <Setter Property="MinHeight" Value="36" />
         <Setter Property="Padding" Value="13,0" />

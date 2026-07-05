@@ -244,6 +244,7 @@
                             </Grid.ColumnDefinitions>
 
                             <ScrollViewer Grid.Column="0"
+                                          Style="{StaticResource RightPaneScrollViewer}"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel x:Name="DetailPanel" />
@@ -256,6 +257,7 @@
                                     CornerRadius="8"
                                     Padding="16">
                                 <ScrollViewer x:Name="FormatWorkScrollViewer"
+                                              Style="{StaticResource RightPaneScrollViewer}"
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel x:Name="FormatWorkPanel" />
