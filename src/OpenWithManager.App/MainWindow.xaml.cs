@@ -182,8 +182,8 @@ public partial class MainWindow : Window
             {
                 Content = FormatCode(extension),
                 Tag = extension,
+                Style = (Style)FindResource("PillButton"),
                 Margin = new Thickness(0, 0, 8, 8),
-                Padding = new Thickness(12, 7, 12, 7)
             };
             button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
             chips.Children.Add(button);
@@ -274,36 +274,48 @@ public partial class MainWindow : Window
     private Button MakeCandidateButton(FormatAppCandidate candidate)
     {
         var isSelected = candidate == _selectedCandidate;
+        var content = new Grid();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var name = new TextBlock
+        {
+            Text = DisplayAppName(candidate.AppName),
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var source = new Border
+        {
+            Padding = new Thickness(8, 4, 8, 4),
+            Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Child = new TextBlock
+            {
+                Text = CandidateSourceLabel(candidate.Source),
+                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        Grid.SetColumn(source, 1);
+        content.Children.Add(name);
+        content.Children.Add(source);
+
         var button = new Button
         {
+            Style = (Style)FindResource("BaseButton"),
             Margin = new Thickness(0, 0, 0, 8),
-            Padding = new Thickness(12),
+            Padding = new Thickness(12, 10, 12, 10),
+            MinHeight = 46,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             BorderBrush = new SolidColorBrush(isSelected ? Color.FromRgb(37, 39, 33) : Color.FromRgb(216, 213, 204)),
             Background = new SolidColorBrush(isSelected ? Color.FromRgb(246, 244, 237) : Color.FromRgb(255, 254, 250)),
-            Content = new DockPanel
-            {
-                LastChildFill = true,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = CandidateSourceLabel(candidate.Source),
-                        Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
-                        FontSize = 12,
-                        VerticalAlignment = VerticalAlignment.Center
-                    },
-                    new TextBlock
-                    {
-                        Text = DisplayAppName(candidate.AppName),
-                        FontWeight = FontWeights.SemiBold,
-                        Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
-                    }
-                }
-            }
+            Content = content
         };
-
-        DockPanel.SetDock(((DockPanel)button.Content).Children[0], Dock.Right);
         button.Click += (_, _) =>
         {
             _selectedCandidate = candidate;
@@ -371,7 +383,8 @@ public partial class MainWindow : Window
         var expander = new Expander
         {
             Header = t("technicalDetails"),
-            Margin = new Thickness(0, 20, 0, 0)
+            Margin = new Thickness(0, 20, 0, 0),
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
         };
         var stack = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         foreach (var item in items)
@@ -393,10 +406,11 @@ public partial class MainWindow : Window
         DetailPanel.Children.Add(new Border
         {
             Margin = new Thickness(0, 8, 0, 22),
-            Padding = new Thickness(14),
+            Padding = new Thickness(16),
             BorderBrush = new SolidColorBrush(Color.FromRgb(222, 219, 211)),
             BorderThickness = new Thickness(1),
             Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
+            CornerRadius = new CornerRadius(8),
             Child = new TextBlock
             {
                 Text = value,
@@ -459,11 +473,9 @@ public partial class MainWindow : Window
         var button = new Button
         {
             Content = text,
+            Style = (Style)FindResource(primary ? "PrimaryButton" : "IconButton"),
             Margin = new Thickness(0, 0, 8, 0),
             Padding = new Thickness(12, 8, 12, 8),
-            Background = new SolidColorBrush(primary ? Color.FromRgb(37, 39, 33) : Color.FromRgb(255, 254, 250)),
-            Foreground = new SolidColorBrush(primary ? Color.FromRgb(255, 254, 250) : Color.FromRgb(37, 39, 33)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(216, 213, 204))
         };
         button.Click += click;
         return button;
@@ -473,6 +485,8 @@ public partial class MainWindow : Window
     {
         AllFilterButton.Content = $"{t("all")} ({_allKinds.Count})";
         ReviewFilterButton.Content = $"{t("needsReview")} ({_allKinds.Count(NeedsReview)})";
+        AllFilterButton.Style = (Style)FindResource(_status == "All" ? "PrimaryButton" : "IconButton");
+        ReviewFilterButton.Style = (Style)FindResource(_status == "Review" ? "PrimaryButton" : "IconButton");
     }
 
     private static bool NeedsReview(FileKindSummary kind)
