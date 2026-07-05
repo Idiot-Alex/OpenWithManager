@@ -110,6 +110,111 @@ public sealed class FileAssociationService
         return result >= 0 && buffer.Length > 0 ? buffer.ToString() : value;
     }
 
+    public static AppIconLocation? ReadIconLocation(string? progId)
+    {
+        if (string.IsNullOrWhiteSpace(progId))
+        {
+            return null;
+        }
+
+        return ReadRegistryIconLocation($@"{progId}\DefaultIcon")
+            ?? ReadRegistryOpenCommandIconLocation($@"{progId}\shell\open\command");
+    }
+
+    public static AppIconLocation? ReadApplicationIconLocation(string executableName)
+    {
+        if (string.IsNullOrWhiteSpace(executableName))
+        {
+            return null;
+        }
+
+        return ReadRegistryIconLocation($@"Applications\{executableName}\DefaultIcon")
+            ?? ReadRegistryOpenCommandIconLocation($@"Applications\{executableName}\shell\open\command")
+            ?? ReadAppPathIconLocation(Registry.CurrentUser, executableName)
+            ?? ReadAppPathIconLocation(Registry.LocalMachine, executableName);
+    }
+
+    private static AppIconLocation? ReadRegistryIconLocation(string keyPath)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
+        return ParseIconLocation(key?.GetValue(null) as string);
+    }
+
+    private static AppIconLocation? ReadRegistryOpenCommandIconLocation(string keyPath)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
+        return ParseCommandLocation(key?.GetValue(null) as string);
+    }
+
+    private static AppIconLocation? ReadAppPathIconLocation(RegistryKey hive, string executableName)
+    {
+        using var key = hive.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\App Paths\{executableName}");
+        return ParseCommandLocation(key?.GetValue(null) as string);
+    }
+
+    private static AppIconLocation? ParseIconLocation(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var text = Environment.ExpandEnvironmentVariables(value.Trim());
+        var path = text;
+        var index = 0;
+        if (text.StartsWith('"'))
+        {
+            var endQuote = text.IndexOf('"', 1);
+            if (endQuote > 1)
+            {
+                path = text[1..endQuote];
+                index = ParseIconIndex(text[(endQuote + 1)..]);
+            }
+        }
+        else
+        {
+            var commaIndex = text.LastIndexOf(',');
+            if (commaIndex > 0 && int.TryParse(text[(commaIndex + 1)..].Trim(), out var parsedIndex))
+            {
+                path = text[..commaIndex];
+                index = parsedIndex;
+            }
+        }
+
+        path = path.Trim().Trim('"');
+        return string.IsNullOrWhiteSpace(path) ? null : new AppIconLocation(path, index);
+    }
+
+    private static AppIconLocation? ParseCommandLocation(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var text = Environment.ExpandEnvironmentVariables(value.Trim());
+        string path;
+        if (text.StartsWith('"'))
+        {
+            var endQuote = text.IndexOf('"', 1);
+            path = endQuote > 1 ? text[1..endQuote] : text.Trim('"');
+        }
+        else
+        {
+            var exeIndex = text.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+            path = exeIndex > 0 ? text[..(exeIndex + 4)] : text.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+        }
+
+        path = path.Trim().Trim('"');
+        return string.IsNullOrWhiteSpace(path) ? null : new AppIconLocation(path);
+    }
+
+    private static int ParseIconIndex(string value)
+    {
+        var commaIndex = value.LastIndexOf(',');
+        return commaIndex >= 0 && int.TryParse(value[(commaIndex + 1)..].Trim(), out var index) ? index : 0;
+    }
+
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     private static extern int SHLoadIndirectString(
         string source,

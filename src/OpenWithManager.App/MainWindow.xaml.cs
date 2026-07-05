@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly WindowsSettingsService _settings = new();
     private readonly ExportImportService _exports = new();
     private readonly LocalizationService _text = new();
+    private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
     private readonly ObservableCollection<FileKindSummary> _visibleKinds = [];
 
@@ -268,6 +269,7 @@ public partial class MainWindow : Window
     {
         var isSelected = candidate == _state.SelectedCandidate;
         var content = new Grid();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -278,6 +280,7 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
             VerticalAlignment = VerticalAlignment.Center
         };
+        Grid.SetColumn(name, 1);
         var source = new Border
         {
             Padding = new Thickness(8, 4, 8, 4),
@@ -294,7 +297,8 @@ public partial class MainWindow : Window
                 VerticalAlignment = VerticalAlignment.Center
             }
         };
-        Grid.SetColumn(source, 1);
+        Grid.SetColumn(source, 2);
+        content.Children.Add(MakeCandidateIcon(candidate));
         content.Children.Add(name);
         content.Children.Add(source);
 
@@ -315,6 +319,42 @@ public partial class MainWindow : Window
             RenderDetail();
         };
         return button;
+    }
+
+    private FrameworkElement MakeCandidateIcon(FormatAppCandidate candidate)
+    {
+        var icon = _icons.GetIcon(candidate.Icon);
+        var holder = new Border
+        {
+            Width = 30,
+            Height = 30,
+            Margin = new Thickness(0, 0, 10, 0),
+            Background = new SolidColorBrush(Color.FromRgb(240, 238, 230)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7)
+        };
+
+        holder.Child = icon is null
+            ? new TextBlock
+            {
+                Text = CandidateInitial(candidate.AppName),
+                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+            : new Image
+            {
+                Source = icon,
+                Width = 20,
+                Height = 20,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+        return holder;
     }
 
     private async Task OpenDefaultSettingsAsync()
@@ -525,6 +565,11 @@ public partial class MainWindow : Window
     private static string FormatCode(string extension)
     {
         return extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string CandidateInitial(string appName)
+    {
+        return string.IsNullOrWhiteSpace(appName) ? "?" : appName.Trim()[0].ToString().ToUpperInvariant();
     }
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e)

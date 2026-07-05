@@ -3,6 +3,7 @@ namespace OpenWithManager.App.Models;
 public sealed record FormatAppCandidate(
     string AppName,
     string? ProgId,
+    AppIconLocation? Icon,
     string Source,
     bool IsCurrent,
     string? SettingsParameterName = null,

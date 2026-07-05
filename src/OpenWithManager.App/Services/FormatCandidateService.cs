@@ -27,6 +27,7 @@ public sealed class FormatCandidateService
             candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,
                 currentItem.ProgId,
+                FileAssociationService.ReadIconLocation(currentItem.ProgId),
                 "Current",
                 true));
         }
@@ -50,9 +51,11 @@ public sealed class FormatCandidateService
                     && !string.IsNullOrWhiteSpace(candidate.SettingsParameterValue));
                 var shellTarget = group.FirstOrDefault(candidate =>
                     !string.IsNullOrWhiteSpace(candidate.ShellHandlerId));
+                var iconTarget = group.FirstOrDefault(candidate => candidate.Icon is not null);
 
                 return selected with
                 {
+                    Icon = selected.Icon ?? iconTarget?.Icon,
                     SettingsParameterName = settingsTarget?.SettingsParameterName ?? selected.SettingsParameterName,
                     SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue,
                     ShellHandlerId = shellTarget?.ShellHandlerId ?? selected.ShellHandlerId,
@@ -87,6 +90,7 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
+                FileAssociationService.ReadIconLocation(progId),
                 "OpenWithProgids",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
         }
@@ -111,7 +115,12 @@ public sealed class FormatCandidateService
             }
 
             var appName = ReadApplicationName(executableName) ?? executableName;
-            yield return new FormatAppCandidate(appName, null, "OpenWithList", false);
+            yield return new FormatAppCandidate(
+                appName,
+                null,
+                FileAssociationService.ReadApplicationIconLocation(executableName),
+                "OpenWithList",
+                false);
         }
     }
 
@@ -163,6 +172,7 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
+                FileAssociationService.ReadIconLocation(progId),
                 "RegisteredApplication",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase),
                 settingsParameterName,
