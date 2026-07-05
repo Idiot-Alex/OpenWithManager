@@ -84,6 +84,10 @@ function handlePreviewRequest(request) {
     return { opened: true };
   }
 
+  if (request.action === "formats:makeDefault") {
+    return { changed: true };
+  }
+
   if (request.action === "config:export" || request.action === "config:import") {
     return { cancelled: true };
   }
@@ -111,9 +115,18 @@ function previewFormatCandidates(extension) {
   const seen = new Set();
   candidates.forEach((candidate) => {
     const key = candidate.progId ? `prog:${candidate.progId}` : `app:${candidate.appName}`;
+    const existing = distinctCandidates.find((item) => {
+      const itemKey = item.progId ? `prog:${item.progId}` : `app:${item.appName}`;
+      return itemKey === key;
+    });
+    if (existing && !existing.settingsParameterName && candidate.settingsParameterName) {
+      existing.settingsParameterName = candidate.settingsParameterName;
+      existing.settingsParameterValue = candidate.settingsParameterValue;
+    }
+
     if (!seen.has(key)) {
-      seen.add(key);
       distinctCandidates.push(candidate);
+      seen.add(key);
     }
   });
 
@@ -128,36 +141,40 @@ function previewFormatCandidates(extension) {
 function previewCandidatePool(extension) {
   if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(extension)) {
     return [
-      previewCandidate("Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "RegisteredApplication"),
-      previewCandidate("Google Chrome", "ChromeHTML", "RegisteredApplication"),
-      previewCandidate("Visual Studio Code", "VSCode.svg", "OpenWithProgids"),
+      previewCandidate("Photos", "AppX43hnxtbyyps62jhe9sqpdzxn1790zetc", "RegisteredApplication", false, "registeredAUMID", "Microsoft.Windows.Photos_8wekyb3d8bbwe!App"),
+      previewCandidate("Google Chrome", "ChromeHTML", "RegisteredApplication", false, "registeredAppMachine", "Google Chrome"),
+      previewCandidate("Visual Studio Code", "VSCode.svg", "RegisteredApplication", false, "registeredAppUser", "Visual Studio Code"),
     ];
   }
 
   if ([".txt", ".md", ".json", ".js", ".ts", ".cs", ".py"].includes(extension)) {
     return [
-      previewCandidate("Visual Studio Code", "VSCode.js", "RegisteredApplication"),
+      previewCandidate("Visual Studio Code", "VSCode.js", "RegisteredApplication", false, "registeredAppUser", "Visual Studio Code"),
       previewCandidate("Notepad", "txtfile", "OpenWithList"),
     ];
   }
 
   if (extension === ".pdf") {
     return [
-      previewCandidate("Adobe Acrobat", "AcroExch.Document", "RegisteredApplication"),
-      previewCandidate("Microsoft Edge", "MSEdgePDF", "OpenWithProgids"),
+      previewCandidate("Adobe Acrobat", "AcroExch.Document", "RegisteredApplication", false, "registeredAppMachine", "Adobe Acrobat"),
+      previewCandidate("Microsoft Edge", "MSEdgePDF", "RegisteredApplication", false, "registeredAppMachine", "Microsoft Edge"),
     ];
   }
 
   return [];
 }
 
-function previewCandidate(appName, progId, source, isCurrent = false) {
+function previewCandidate(appName, progId, source, isCurrent = false, settingsParameterName = null, settingsParameterValue = null) {
   return {
     appName,
     progId,
     iconDataUrl: null,
     source,
     isCurrent,
+    settingsParameterName,
+    settingsParameterValue,
+    shellHandlerId: progId || appName,
+    canMakeDefault: source === "RegisteredApplication",
   };
 }
 

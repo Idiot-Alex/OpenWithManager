@@ -5,4 +5,8 @@ public sealed record FormatAppCandidate(
     string? ProgId,
     string? IconDataUrl,
     string Source,
-    bool IsCurrent);
+    bool IsCurrent,
+    string? SettingsParameterName = null,
+    string? SettingsParameterValue = null,
+    string? ShellHandlerId = null,
+    bool CanMakeDefault = false);

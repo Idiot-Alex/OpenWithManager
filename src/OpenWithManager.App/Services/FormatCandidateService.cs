@@ -6,10 +6,12 @@ namespace OpenWithManager.App.Services;
 public sealed class FormatCandidateService
 {
     private readonly FileAssociationService _fileAssociations;
+    private readonly ShellAssociationService _shellAssociations;
 
-    public FormatCandidateService(FileAssociationService fileAssociations)
+    public FormatCandidateService(FileAssociationService fileAssociations, ShellAssociationService shellAssociations)
     {
         _fileAssociations = fileAssociations;
+        _shellAssociations = shellAssociations;
     }
 
     public FormatCandidateResult GetCandidates(string extension)
@@ -30,6 +32,7 @@ public sealed class FormatCandidateService
                 true));
         }
 
+        candidates.AddRange(_shellAssociations.GetHandlers(normalizedExtension));
         candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem?.ProgId));
         candidates.AddRange(ReadOpenWithList(normalizedExtension, currentItem?.ProgId));
         candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem?.ProgId));
@@ -37,10 +40,26 @@ public sealed class FormatCandidateService
         var distinctCandidates = candidates
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate.AppName))
             .GroupBy(CandidateKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group
-                .OrderByDescending(candidate => candidate.IsCurrent)
-                .ThenBy(SourcePriority)
-                .First())
+            .Select(group =>
+            {
+                var selected = group
+                    .OrderByDescending(candidate => candidate.IsCurrent)
+                    .ThenBy(SourcePriority)
+                    .First();
+                var settingsTarget = group.FirstOrDefault(candidate =>
+                    !string.IsNullOrWhiteSpace(candidate.SettingsParameterName)
+                    && !string.IsNullOrWhiteSpace(candidate.SettingsParameterValue));
+                var shellTarget = group.FirstOrDefault(candidate =>
+                    !string.IsNullOrWhiteSpace(candidate.ShellHandlerId));
+
+                return selected with
+                {
+                    SettingsParameterName = settingsTarget?.SettingsParameterName ?? selected.SettingsParameterName,
+                    SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue,
+                    ShellHandlerId = shellTarget?.ShellHandlerId ?? selected.ShellHandlerId,
+                    CanMakeDefault = shellTarget?.CanMakeDefault ?? selected.CanMakeDefault
+                };
+            })
             .OrderByDescending(candidate => candidate.IsCurrent)
             .ThenBy(SourcePriority)
             .ThenBy(candidate => candidate.AppName)
@@ -100,12 +119,12 @@ public sealed class FormatCandidateService
 
     private static IEnumerable<FormatAppCandidate> ReadRegisteredApplications(string extension, string? currentProgId)
     {
-        foreach (var candidate in ReadRegisteredApplications(Registry.CurrentUser, extension, currentProgId))
+        foreach (var candidate in ReadRegisteredApplications(Registry.CurrentUser, "registeredAppUser", extension, currentProgId))
         {
             yield return candidate;
         }
 
-        foreach (var candidate in ReadRegisteredApplications(Registry.LocalMachine, extension, currentProgId))
+        foreach (var candidate in ReadRegisteredApplications(Registry.LocalMachine, "registeredAppMachine", extension, currentProgId))
         {
             yield return candidate;
         }
@@ -113,6 +132,7 @@ public sealed class FormatCandidateService
 
     private static IEnumerable<FormatAppCandidate> ReadRegisteredApplications(
         RegistryKey hive,
+        string settingsParameterName,
         string extension,
         string? currentProgId)
     {
@@ -147,7 +167,9 @@ public sealed class FormatCandidateService
                 progId,
                 FileAssociationService.ReadIconDataUrl(progId),
                 "RegisteredApplication",
-                string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
+                string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase),
+                settingsParameterName,
+                valueName);
         }
     }
 
@@ -169,10 +191,12 @@ public sealed class FormatCandidateService
         return candidate.Source switch
         {
             "Current" => 0,
-            "RegisteredApplication" => 1,
-            "OpenWithProgids" => 2,
-            "OpenWithList" => 3,
-            _ => 4
+            "ShellRecommended" => 1,
+            "RegisteredApplication" => 2,
+            "ShellHandler" => 3,
+            "OpenWithProgids" => 4,
+            "OpenWithList" => 5,
+            _ => 6
         };
     }
 

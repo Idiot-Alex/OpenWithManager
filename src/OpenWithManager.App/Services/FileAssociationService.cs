@@ -100,6 +100,11 @@ public sealed class FileAssociationService
     public static string? ReadIconDataUrl(string? progId)
     {
         var iconPath = ReadOpenCommandPath(progId) ?? ReadIconPath(progId);
+        return ReadFileIconDataUrl(iconPath);
+    }
+
+    public static string? ReadFileIconDataUrl(string? iconPath)
+    {
         if (string.IsNullOrWhiteSpace(iconPath))
         {
             return null;

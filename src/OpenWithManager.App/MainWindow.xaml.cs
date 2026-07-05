@@ -10,6 +10,7 @@ namespace OpenWithManager.App;
 public partial class MainWindow : Window
 {
     private readonly FileAssociationService _fileAssociations = new();
+    private readonly ShellAssociationService _shellAssociations = new();
     private readonly FileKindService _fileKinds;
     private readonly FormatCandidateService _formatCandidates;
     private readonly WindowsSettingsService _settings = new();
@@ -22,7 +23,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         _fileKinds = new FileKindService(_fileAssociations);
-        _formatCandidates = new FormatCandidateService(_fileAssociations);
+        _formatCandidates = new FormatCandidateService(_fileAssociations, _shellAssociations);
         InitializeComponent();
         Loaded += OnLoaded;
     }
@@ -92,12 +93,36 @@ public partial class MainWindow : Window
                 return new { opened = true };
 
             case "settings:openExtension":
-                var extensionToOpen = request.Payload.TryGetProperty("extension", out var extensionValue)
-                    ? extensionValue.GetString()
+                var parameterName = request.Payload.TryGetProperty("settingsParameterName", out var parameterNameValue)
+                    ? parameterNameValue.GetString()
+                    : null;
+                var parameterValue = request.Payload.TryGetProperty("settingsParameterValue", out var parameterValueValue)
+                    ? parameterValueValue.GetString()
                     : null;
 
-                _settings.OpenDefaultApps(extensionToOpen);
+                _settings.OpenDefaultApps(parameterName, parameterValue);
                 return new { opened = true };
+
+            case "formats:makeDefault":
+                var defaultExtension = request.Payload.TryGetProperty("extension", out var defaultExtensionValue)
+                    ? defaultExtensionValue.GetString()
+                    : null;
+                var shellHandlerId = request.Payload.TryGetProperty("shellHandlerId", out var shellHandlerIdValue)
+                    ? shellHandlerIdValue.GetString()
+                    : null;
+                var appName = request.Payload.TryGetProperty("appName", out var appNameValue)
+                    ? appNameValue.GetString()
+                    : null;
+
+                if (string.IsNullOrWhiteSpace(defaultExtension)
+                    || string.IsNullOrWhiteSpace(shellHandlerId)
+                    || string.IsNullOrWhiteSpace(appName))
+                {
+                    throw new InvalidOperationException("Missing default app selection.");
+                }
+
+                _shellAssociations.MakeDefault(defaultExtension, shellHandlerId, appName);
+                return new { changed = true };
 
             case "config:export":
                 return ExportConfig();

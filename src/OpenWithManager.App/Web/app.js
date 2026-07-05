@@ -404,13 +404,16 @@ function renderFormatDetail(kind, extension) {
     <div class="detail-actions">
       <button class="button primary" type="button" id="changeFormatButton" ${selectedCandidate ? "" : "disabled"}>
         ${icon("external-link")}
-        <span>${escapeHtml(t("changeInWindows"))}</span>
+        <span>${escapeHtml(formatActionLabel(selectedCandidate))}</span>
       </button>
+      ${selectedCandidate?.canMakeDefault ? `
+        <button class="button secondary" type="button" id="makeDefaultButton">
+          ${icon("check")}
+          <span>${escapeHtml(t("setAsDefault"))}</span>
+        </button>
+      ` : ""}
     </div>
-    <p class="settings-hint">${escapeHtml(t("formatSettingsHint", {
-      extension: formatCode(extension),
-      app: appName(selectedCandidate?.appName),
-    }))}</p>
+    <p class="settings-hint">${escapeHtml(formatSettingsHint(extension, selectedCandidate))}</p>
 
     <details class="technical">
       <summary>${escapeHtml(t("technicalDetails"))}</summary>
@@ -435,6 +438,7 @@ function renderFormatDetail(kind, extension) {
   });
 
   document.querySelector("#changeFormatButton").addEventListener("click", () => openFormatSettings(extension, selectedCandidate));
+  document.querySelector("#makeDefaultButton")?.addEventListener("click", () => makeFormatDefault(extension, selectedCandidate));
   refreshIcons();
 }
 
@@ -477,11 +481,43 @@ async function openFormatSettings(extension, candidate) {
       extension,
       progId: candidate?.progId,
       appName: candidate?.appName,
+      settingsParameterName: candidate?.settingsParameterName,
+      settingsParameterValue: candidate?.settingsParameterValue,
     });
-    showToast(t("chooseInWindowsToast", {
+    showToast(t(hasAppSettingsLink(candidate) ? "chooseInAppDefaultsToast" : "chooseInWindowsToast", {
       extension: formatCode(extension),
       app: appName(candidate?.appName),
     }));
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function makeFormatDefault(extension, candidate) {
+  if (!candidate?.canMakeDefault || !candidate.shellHandlerId) {
+    return;
+  }
+
+  const confirmed = window.confirm(t("confirmSetDefault", {
+    extension: formatCode(extension),
+    app: appName(candidate.appName),
+  }));
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await callHost("formats:makeDefault", {
+      extension,
+      shellHandlerId: candidate.shellHandlerId,
+      appName: candidate.appName,
+    });
+    showToast(t("setDefaultToast", {
+      extension: formatCode(extension),
+      app: appName(candidate.appName),
+    }));
+    await loadFileKinds();
+    await selectFormat(extension);
   } catch (error) {
     showToast(error.message);
   }
@@ -655,9 +691,27 @@ function candidateSourceLabel(source) {
   return {
     Current: t("current"),
     RegisteredApplication: t("recommended"),
+    ShellRecommended: t("recommended"),
+    ShellHandler: t("availableApp"),
     OpenWithProgids: t("knownForFormat"),
     OpenWithList: t("usedBefore"),
   }[source] || source;
+}
+
+function hasAppSettingsLink(candidate) {
+  return Boolean(candidate?.settingsParameterName && candidate?.settingsParameterValue);
+}
+
+function formatActionLabel(candidate) {
+  return hasAppSettingsLink(candidate) ? t("openAppDefaults") : t("changeInWindows");
+}
+
+function formatSettingsHint(extension, candidate) {
+  const key = hasAppSettingsLink(candidate) ? "appDefaultsHint" : "formatSettingsHint";
+  return t(key, {
+    extension: formatCode(extension),
+    app: appName(candidate?.appName),
+  });
 }
 
 function kindTitle(kind) {

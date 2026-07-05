@@ -4,13 +4,27 @@ namespace OpenWithManager.App.Services;
 
 public sealed class WindowsSettingsService
 {
-    public void OpenDefaultApps(string? extension = null)
+    private static readonly HashSet<string> SupportedDefaultAppParameters = new(StringComparer.Ordinal)
     {
-        // Windows does not expose a stable public deep link for every extension picker.
-        // Keep this conservative and open the supported default apps settings page.
+        "registeredAppMachine",
+        "registeredAppUser",
+        "registeredAUMID"
+    };
+
+    public void OpenDefaultApps(string? parameterName = null, string? parameterValue = null)
+    {
+        var target = "ms-settings:defaultapps";
+        if (parameterName is not null
+            && parameterValue is not null
+            && SupportedDefaultAppParameters.Contains(parameterName)
+            && !string.IsNullOrWhiteSpace(parameterValue))
+        {
+            target = $"{target}?{parameterName}={Uri.EscapeDataString(parameterValue)}";
+        }
+
         Process.Start(new ProcessStartInfo
         {
-            FileName = "ms-settings:defaultapps",
+            FileName = target,
             UseShellExecute = true
         });
     }
