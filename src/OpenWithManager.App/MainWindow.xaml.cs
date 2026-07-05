@@ -268,26 +268,14 @@ public partial class MainWindow : Window
 
         AddEyebrow(t("fileKind"));
         AddTitle(_state.SelectedKind.DisplayName);
-        AddStatus(_state.SelectedKind);
-        AddSection(t("currentApp"), DisplayAppName(_state.SelectedKind.PrimaryAppName), true);
+        AddSummary(FormatKindSummary(_state.SelectedKind));
 
-        AddSectionLabel(t("includedFormats"));
-        AddFormatRows(_state.SelectedKind);
-
-        if (_state.SelectedKind.Outliers.Count > 0)
-        {
-            AddSectionLabel(t("exceptions"));
-            foreach (var outlier in _state.SelectedKind.Outliers)
-            {
-                AddMuted($"{outlier.Extension.ToUpperInvariant()}  {DisplayAppName(outlier.AppName)}");
-            }
-        }
-
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 10) };
-        actions.Children.Add(MakeButton(t("chooseApp"), async (_, _) => await OpenDefaultSettingsAsync(), true));
-        actions.Children.Add(MakeButton(t("openDefaultApps"), async (_, _) => await OpenDefaultSettingsAsync()));
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 18, 0, 22) };
+        actions.Children.Add(MakeButton(t("openDefaultApps"), async (_, _) => await OpenDefaultSettingsAsync(), true));
         DetailPanel.Children.Add(actions);
-        AddMuted(t("settingsHint"));
+
+        AddSectionLabel(t("formats"));
+        AddFormatRows(_state.SelectedKind);
 
         AddTechnicalItems(_state.SelectedKind.Items);
     }
@@ -509,17 +497,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddStatus(FileKindSummary kind)
-    {
-        var text = kind.Status switch
-        {
-            FileKindStatus.Mixed => kind.Outliers.Count == 1 ? t("oneException") : t("exceptionsCount", ("count", kind.Outliers.Count.ToString())),
-            FileKindStatus.Missing => t("noAppSet"),
-            _ => t("allSet")
-        };
-        AddMuted(text);
-    }
-
     private void AddTechnicalItems(IReadOnlyCollection<FileAssociationItem> items)
     {
         var expander = new Expander
@@ -550,24 +527,36 @@ public partial class MainWindow : Window
         foreach (var extension in kind.Extensions)
         {
             byExtension.TryGetValue(extension, out var item);
-            rows.Children.Add(MakeFormatRowButton(extension, DisplayAppName(item?.FriendlyName ?? item?.ProgId)));
+            rows.Children.Add(MakeFormatRowButton(
+                extension,
+                item?.Description ?? extension,
+                DisplaySummaryAppName(item?.FriendlyName ?? item?.ProgId, kind)));
         }
 
         DetailPanel.Children.Add(rows);
     }
 
-    private Button MakeFormatRowButton(string extension, string appName)
+    private Button MakeFormatRowButton(string extension, string description, string appName)
     {
         var content = new Grid();
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(64) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
 
         var code = new TextBlock
         {
-            Text = FormatCode(extension),
+            Text = FormatExtensionLabel(extension),
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var descriptionText = new TextBlock
+        {
+            Text = description,
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
         var app = new TextBlock
@@ -577,8 +566,10 @@ public partial class MainWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
-        Grid.SetColumn(app, 1);
+        Grid.SetColumn(descriptionText, 1);
+        Grid.SetColumn(app, 2);
         content.Children.Add(code);
+        content.Children.Add(descriptionText);
         content.Children.Add(app);
 
         var button = new Button
@@ -624,6 +615,17 @@ public partial class MainWindow : Window
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
             Margin = new Thickness(0, 0, 0, 10)
+        });
+    }
+
+    private void AddSummary(string text)
+    {
+        DetailPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 2)
         });
     }
 
@@ -726,6 +728,11 @@ public partial class MainWindow : Window
     private static string FormatCode(string extension)
     {
         return extension.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string FormatExtensionLabel(string extension)
+    {
+        return $".{FormatCode(extension)}";
     }
 
     private static string CandidateInitial(string appName)
