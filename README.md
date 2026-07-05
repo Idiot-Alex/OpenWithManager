@@ -10,7 +10,8 @@ bypass Windows default-app protections.
 
 ## Current App
 
-- Browse common file kinds with a localized summary and current app icon group.
+- Browse system-registered file formats grouped into file kinds with a localized
+  summary and current app icon group.
 - Search by file kind, extension, description, app name, ProgID, or source.
 - Filter to file kinds that need review.
 - Inspect every included format for a file kind and see the current default app.
@@ -44,6 +45,18 @@ Windows does not expose a stable public URI that opens the candidate app picker
 for a specific extension such as `.js`. OpenWith Manager can open the default
 apps page or, when available, an app-specific defaults page. The user may still
 need to paste or search for the extension in Windows Settings.
+
+## File Format Discovery
+
+OpenWith Manager discovers file formats from the current Windows registry rather
+than relying only on a fixed extension list. It reads extension keys from
+`HKEY_CLASSES_ROOT` and per-user history from
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts`.
+
+Discovered formats are automatically grouped by extension rules, `PerceivedType`,
+MIME content type, ProgID, and description text. The current default app is only
+a weak signal and is not the main source of classification. Formats that cannot
+be classified are shown under `Other formats`.
 
 ## Requirements
 
@@ -131,8 +144,10 @@ src/OpenWithManager.App/
 - Run `.\scripts\package.ps1` and launch `OpenWithManager.exe` from the
   generated portable folder.
 - Confirm the packaged app starts without a UAC prompt.
-- Confirm the left file kind list shows one row per file kind, localized summary
-  text, and deduplicated default-app icon badges.
+- Confirm the left file kind list is populated from system-registered formats,
+  with localized summary text and deduplicated default-app icon badges.
+- Search for a non-preset registered extension, such as `.heic`, `.tsx`, `.sql`,
+  or another extension present on the test machine.
 - Check a multi-format kind such as images and confirm each format row shows the
   correct current app.
 - Select formats such as `.PDF`, `.PNG`, `.JS`, and `.TS` and verify the action
