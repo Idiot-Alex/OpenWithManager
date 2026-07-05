@@ -136,10 +136,13 @@ public partial class MainWindow : Window
             string.Join(" ", kind.Items.SelectMany(item => new[]
             {
                 item.Extension,
+                item.Category,
                 item.Description,
                 item.FriendlyName,
                 item.ProgId,
-                item.Source
+                item.Source,
+                item.ContentType,
+                item.PerceivedType
             }))
         });
 

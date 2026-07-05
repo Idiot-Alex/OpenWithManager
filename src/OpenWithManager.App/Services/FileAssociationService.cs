@@ -9,71 +9,215 @@ namespace OpenWithManager.App.Services;
 
 public sealed class FileAssociationService
 {
-    private static readonly KnownExtension[] BaseKnownExtensions =
+    private static readonly KnownExtension[] SeedKnownExtensions =
     [
-        new(".pdf", "Document", "PDF document"),
-        new(".txt", "Document", "Plain text"),
-        new(".md", "Document", "Markdown"),
-        new(".docx", "Document", "Word document"),
-        new(".xlsx", "Document", "Excel workbook"),
-        new(".pptx", "Document", "PowerPoint presentation"),
-        new(".jpg", "Image", "JPEG image"),
-        new(".jpeg", "Image", "JPEG image"),
-        new(".png", "Image", "PNG image"),
-        new(".gif", "Image", "GIF image"),
-        new(".webp", "Image", "WebP image"),
-        new(".svg", "Image", "SVG image"),
-        new(".mp3", "Audio", "MP3 audio"),
-        new(".wav", "Audio", "WAV audio"),
-        new(".mp4", "Video", "MP4 video"),
-        new(".mov", "Video", "QuickTime video"),
-        new(".mkv", "Video", "Matroska video"),
-        new(".zip", "Archive", "ZIP archive"),
-        new(".rar", "Archive", "RAR archive"),
-        new(".7z", "Archive", "7-Zip archive"),
-        new(".html", "Web", "HTML document"),
-        new(".htm", "Web", "HTML document"),
-        new(".json", "Code", "JSON file"),
-        new(".js", "Code", "JavaScript file"),
-        new(".cs", "Code", "C# source file"),
-        new(".py", "Code", "Python source file")
+        new(".pdf", "PDF document", "application/pdf", "document"),
+        new(".txt", "Plain text", "text/plain", "text"),
+        new(".md", "Markdown", "text/markdown", "text"),
+        new(".docx", "Word document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "document"),
+        new(".xlsx", "Excel workbook", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "document"),
+        new(".pptx", "PowerPoint presentation", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "document"),
+        new(".jpg", "JPEG image", "image/jpeg", "image"),
+        new(".jpeg", "JPEG image", "image/jpeg", "image"),
+        new(".png", "PNG image", "image/png", "image"),
+        new(".gif", "GIF image", "image/gif", "image"),
+        new(".webp", "WebP image", "image/webp", "image"),
+        new(".svg", "SVG image", "image/svg+xml", "image"),
+        new(".mp3", "MP3 audio", "audio/mpeg", "audio"),
+        new(".wav", "WAV audio", "audio/wav", "audio"),
+        new(".mp4", "MP4 video", "video/mp4", "video"),
+        new(".mov", "QuickTime video", "video/quicktime", "video"),
+        new(".mkv", "Matroska video", "video/x-matroska", "video"),
+        new(".ts", "MPEG transport stream video", "video/mp2t", "video"),
+        new(".zip", "ZIP archive", "application/zip", "compressed"),
+        new(".rar", "RAR archive", "application/vnd.rar", "compressed"),
+        new(".7z", "7-Zip archive", "application/x-7z-compressed", "compressed"),
+        new(".html", "HTML document", "text/html", "text"),
+        new(".htm", "HTML document", "text/html", "text"),
+        new(".json", "JSON file", "application/json", "text"),
+        new(".js", "JavaScript file", "text/javascript", "text"),
+        new(".cs", "C# source file", "text/plain", "text"),
+        new(".py", "Python source file", "text/x-python", "text")
     ];
 
     public List<FileAssociationItem> GetKnownAssociations()
     {
-        return GetKnownExtensions()
-            .Select(extension =>
-            {
-                var userChoice = ReadUserChoice(extension.Extension);
-                var shellProgId = ReadAssociationString(extension.Extension, AssocString.ProgId);
-                var fallback = ReadClassDefault(extension.Extension);
-                var progId = userChoice ?? shellProgId ?? fallback;
-                var appName = progId is null
-                    ? null
-                    : ReadDisplayAppName(extension.Extension, extension.Description, progId);
-
-                return new FileAssociationItem(
-                    extension.Extension,
-                    extension.Category,
-                    extension.Description,
-                    progId,
-                    appName,
-                    ReadCurrentAppIconLocation(extension.Extension, progId),
-                    userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown");
-            })
+        return DiscoverExtensions()
+            .Select(ReadAssociation)
             .OrderBy(item => item.Category)
             .ThenBy(item => item.Extension)
             .ToList();
     }
 
-    private IEnumerable<KnownExtension> GetKnownExtensions()
+    public FileAssociationItem GetAssociation(string extension)
     {
-        foreach (var extension in BaseKnownExtensions)
+        var normalized = NormalizeExtension(extension);
+        var extensions = new SortedDictionary<string, ExtensionMetadata>(StringComparer.OrdinalIgnoreCase);
+        foreach (var seed in SeedKnownExtensions.Where(seed => string.Equals(seed.Extension, normalized, StringComparison.OrdinalIgnoreCase)))
         {
-            yield return extension;
+            AddOrUpdateExtension(
+                extensions,
+                seed.Extension,
+                seed.Description,
+                seed.ContentType,
+                seed.PerceivedType);
         }
 
-        yield return new KnownExtension(".ts", "Video", "MPEG transport stream video");
+        using var key = SafeOpenSubKey(Registry.ClassesRoot, normalized);
+        AddOrUpdateExtension(
+            extensions,
+            normalized,
+            key?.GetValue(null) as string,
+            key?.GetValue("Content Type") as string,
+            key?.GetValue("PerceivedType") as string);
+
+        return ReadAssociation(extensions[normalized]);
+    }
+
+    private static FileAssociationItem ReadAssociation(ExtensionMetadata extension)
+    {
+        var userChoice = ReadUserChoice(extension.Extension);
+        var shellProgId = ReadAssociationString(extension.Extension, AssocString.ProgId);
+        var fallback = ReadClassDefault(extension.Extension);
+        var progId = userChoice ?? shellProgId ?? fallback;
+        var description = ReadDescription(extension, progId);
+        var appName = progId is null
+            ? null
+            : ReadDisplayAppName(extension.Extension, description, progId);
+        var source = userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown";
+
+        var item = new FileAssociationItem(
+            extension.Extension,
+            FileFormatClassifier.OtherId,
+            description,
+            progId,
+            appName,
+            ReadCurrentAppIconLocation(extension.Extension, progId),
+            source,
+            extension.ContentType,
+            extension.PerceivedType);
+
+        return item with { Category = FileFormatClassifier.Classify(item) };
+    }
+
+    private static IReadOnlyCollection<ExtensionMetadata> DiscoverExtensions()
+    {
+        var extensions = new SortedDictionary<string, ExtensionMetadata>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extension in SeedKnownExtensions)
+        {
+            AddOrUpdateExtension(
+                extensions,
+                extension.Extension,
+                extension.Description,
+                extension.ContentType,
+                extension.PerceivedType);
+        }
+
+        AddClassesRootExtensions(extensions);
+        AddCurrentUserExtensions(extensions);
+        return extensions.Values.ToList();
+    }
+
+    private static void AddClassesRootExtensions(IDictionary<string, ExtensionMetadata> extensions)
+    {
+        foreach (var extension in SafeGetSubKeyNames(Registry.ClassesRoot))
+        {
+            if (!IsExtensionName(extension))
+            {
+                continue;
+            }
+
+            using var key = SafeOpenSubKey(Registry.ClassesRoot, extension);
+            AddOrUpdateExtension(
+                extensions,
+                extension,
+                key?.GetValue(null) as string,
+                key?.GetValue("Content Type") as string,
+                key?.GetValue("PerceivedType") as string);
+        }
+    }
+
+    private static void AddCurrentUserExtensions(IDictionary<string, ExtensionMetadata> extensions)
+    {
+        using var fileExts = SafeOpenSubKey(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts");
+        if (fileExts is null)
+        {
+            return;
+        }
+
+        foreach (var extension in SafeGetSubKeyNames(fileExts))
+        {
+            if (IsExtensionName(extension))
+            {
+                AddOrUpdateExtension(extensions, extension, null, null, null);
+            }
+        }
+    }
+
+    private static void AddOrUpdateExtension(
+        IDictionary<string, ExtensionMetadata> extensions,
+        string extension,
+        string? description,
+        string? contentType,
+        string? perceivedType)
+    {
+        var normalized = NormalizeExtension(extension);
+        if (!extensions.TryGetValue(normalized, out var metadata))
+        {
+            metadata = new ExtensionMetadata(normalized);
+            extensions[normalized] = metadata;
+        }
+
+        metadata.Description = FirstNonEmpty(metadata.Description, ResolveDisplayName(description));
+        metadata.ContentType = FirstNonEmpty(metadata.ContentType, contentType);
+        metadata.PerceivedType = FirstNonEmpty(metadata.PerceivedType, perceivedType);
+    }
+
+    private static string ReadDescription(ExtensionMetadata extension, string? progId)
+    {
+        return FirstNonEmpty(
+            ReadAssociationString(extension.Extension, AssocString.FriendlyDocName),
+            ReadFriendlyName(progId),
+            extension.Description,
+            $"{extension.Extension.TrimStart('.').ToUpperInvariant()} file")!;
+    }
+
+    private static string[] SafeGetSubKeyNames(RegistryKey key)
+    {
+        try
+        {
+            return key.GetSubKeyNames();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static RegistryKey? SafeOpenSubKey(RegistryKey key, string subKeyName)
+    {
+        try
+        {
+            return key.OpenSubKey(subKeyName);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool IsExtensionName(string value)
+    {
+        return value.Length is > 1 and <= 40
+            && value[0] == '.'
+            && value.Skip(1).All(character => char.IsLetterOrDigit(character)
+                || character is '_' or '-' or '+' or '#');
+    }
+
+    private static string NormalizeExtension(string extension)
+    {
+        var value = extension.Trim();
+        return value.StartsWith('.') ? value.ToLowerInvariant() : $".{value.ToLowerInvariant()}";
     }
 
     private static string? ReadUserChoice(string extension)
@@ -404,5 +548,25 @@ public sealed class FileAssociationService
         AppIconReference = 23
     }
 
-    private sealed record KnownExtension(string Extension, string Category, string Description);
+    private sealed record KnownExtension(
+        string Extension,
+        string Description,
+        string? ContentType = null,
+        string? PerceivedType = null);
+
+    private sealed class ExtensionMetadata
+    {
+        public ExtensionMetadata(string extension)
+        {
+            Extension = extension;
+        }
+
+        public string Extension { get; }
+
+        public string? Description { get; set; }
+
+        public string? ContentType { get; set; }
+
+        public string? PerceivedType { get; set; }
+    }
 }

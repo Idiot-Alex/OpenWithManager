@@ -4,75 +4,10 @@ namespace OpenWithManager.App.Services;
 
 public sealed class FileKindService
 {
-    private static readonly FileKindProfile[] Profiles =
-    [
-        new(
-            "images",
-            "Photos and images",
-            "Images",
-            "Pictures, screenshots, and image assets.",
-            [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]),
-        new(
-            "videos",
-            "Videos",
-            "Videos",
-            "Movies, clips, and screen recordings.",
-            [".mp4", ".mov", ".mkv", ".ts"]),
-        new(
-            "music",
-            "Music and audio",
-            "Audio",
-            "Songs, recordings, and sound files.",
-            [".mp3", ".wav"]),
-        new(
-            "pdf",
-            "PDF documents",
-            "PDF",
-            "Portable documents and forms.",
-            [".pdf"]),
-        new(
-            "word",
-            "Word documents",
-            "Word",
-            "Microsoft Word documents.",
-            [".docx"]),
-        new(
-            "spreadsheets",
-            "Spreadsheets",
-            "Sheet",
-            "Excel workbooks and spreadsheet files.",
-            [".xlsx"]),
-        new(
-            "presentations",
-            "Presentations",
-            "Deck",
-            "PowerPoint presentation files.",
-            [".pptx"]),
-        new(
-            "notes",
-            "Text and notes",
-            "Text",
-            "Plain text and Markdown notes.",
-            [".txt", ".md"]),
-        new(
-            "archives",
-            "Compressed files",
-            "Archives",
-            "Zip, 7-Zip, and other packaged files.",
-            [".zip", ".rar", ".7z"]),
-        new(
-            "code",
-            "Code files",
-            "Code",
-            "Developer files that usually open in an editor.",
-            [".json", ".js", ".cs", ".py"]),
-        new(
-            "web",
-            "Web pages",
-            "Web",
-            "HTML files and pages saved from the web.",
-            [".html", ".htm"])
-    ];
+    private static readonly IReadOnlyDictionary<string, int> DefinitionOrder =
+        FileFormatClassifier.KindDefinitions
+            .Select((definition, index) => new { definition.Id, Index = index })
+            .ToDictionary(item => item.Id, item => item.Index, StringComparer.OrdinalIgnoreCase);
 
     private readonly FileAssociationService _fileAssociations;
 
@@ -84,22 +19,40 @@ public sealed class FileKindService
     public List<FileKindSummary> GetFileKinds()
     {
         var associations = _fileAssociations.GetKnownAssociations();
-        var byExtension = associations.ToDictionary(item => item.Extension, StringComparer.OrdinalIgnoreCase);
+        var byCategory = associations
+            .GroupBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(item => item.Extension, StringComparer.OrdinalIgnoreCase).ToList(),
+                StringComparer.OrdinalIgnoreCase);
 
-        return Profiles
-            .Select(profile => BuildSummary(profile, byExtension))
-            .OrderBy(StatusPriority)
+        return FileFormatClassifier.KindDefinitions
+            .Select(definition => BuildSummary(definition, GetCategoryItems(byCategory, definition.Id)))
+            .Where(summary => summary.TotalFormats > 0)
+            .OrderBy(summary => DefinitionOrder.TryGetValue(summary.Id, out var order) ? order : int.MaxValue)
             .ThenBy(summary => summary.DisplayName)
             .ToList();
     }
 
-    private static FileKindSummary BuildSummary(
-        FileKindProfile profile,
-        IReadOnlyDictionary<string, FileAssociationItem> associations)
+    private static IReadOnlyCollection<FileAssociationItem> GetCategoryItems(
+        IReadOnlyDictionary<string, List<FileAssociationItem>> byCategory,
+        string categoryId)
     {
-        var items = profile.Extensions
-            .Select(extension => associations.TryGetValue(extension, out var item) ? item : null)
-            .OfType<FileAssociationItem>()
+        return byCategory.TryGetValue(categoryId, out var items)
+            ? items
+            : Array.Empty<FileAssociationItem>();
+    }
+
+    private static FileKindSummary BuildSummary(
+        FileKindDefinition definition,
+        IReadOnlyCollection<FileAssociationItem> associations)
+    {
+        var items = associations
+            .OrderBy(item => item.Extension, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var extensions = items
+            .Select(item => item.Extension)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var appGroups = items
@@ -135,11 +88,11 @@ public sealed class FileKindService
             .ToList();
 
         return new FileKindSummary(
-            profile.Id,
-            profile.DisplayName,
-            profile.ShortName,
-            profile.Description,
-            profile.Extensions,
+            definition.Id,
+            definition.DisplayName,
+            definition.ShortName,
+            definition.Description,
+            extensions,
             primaryItem is null ? null : DisplayAppName(primaryItem),
             primaryItem?.ProgId,
             matchingFormats,
@@ -153,21 +106,4 @@ public sealed class FileKindService
     {
         return item.FriendlyName ?? item.ProgId ?? "No default app";
     }
-
-    private static int StatusPriority(FileKindSummary summary)
-    {
-        return summary.Status switch
-        {
-            FileKindStatus.Mixed => 0,
-            FileKindStatus.Missing => 1,
-            _ => 2
-        };
-    }
-
-    private sealed record FileKindProfile(
-        string Id,
-        string DisplayName,
-        string ShortName,
-        string Description,
-        IReadOnlyCollection<string> Extensions);
 }

@@ -17,12 +17,10 @@ public sealed class FormatCandidateService
     public FormatCandidateResult GetCandidates(string extension)
     {
         var normalizedExtension = NormalizeExtension(extension);
-        var currentItem = _fileAssociations
-            .GetKnownAssociations()
-            .FirstOrDefault(item => string.Equals(item.Extension, normalizedExtension, StringComparison.OrdinalIgnoreCase));
+        var currentItem = _fileAssociations.GetAssociation(normalizedExtension);
 
         var candidates = new List<FormatAppCandidate>();
-        if (!string.IsNullOrWhiteSpace(currentItem?.ProgId))
+        if (!string.IsNullOrWhiteSpace(currentItem.ProgId))
         {
             candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,
@@ -33,9 +31,9 @@ public sealed class FormatCandidateService
         }
 
         candidates.AddRange(_shellAssociations.GetHandlers(normalizedExtension));
-        candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem?.ProgId));
+        candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem.ProgId));
         candidates.AddRange(ReadOpenWithList(normalizedExtension));
-        candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem?.ProgId));
+        candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem.ProgId));
 
         var distinctCandidates = candidates
             .Where(candidate => !string.IsNullOrWhiteSpace(candidate.AppName))
@@ -69,7 +67,7 @@ public sealed class FormatCandidateService
 
         return new FormatCandidateResult(
             normalizedExtension,
-            currentItem?.Description ?? normalizedExtension,
+            currentItem.Description,
             distinctCandidates.FirstOrDefault(candidate => candidate.IsCurrent),
             distinctCandidates);
     }
