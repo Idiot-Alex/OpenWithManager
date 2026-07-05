@@ -272,28 +272,126 @@ public partial class MainWindow : Window
             return;
         }
 
-        AddEyebrow(t("fileKind"));
-        AddTitle(_state.SelectedKind.DisplayName);
-        AddSummary(FormatKindSummary(_state.SelectedKind));
-
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 18, 0, 22) };
-        actions.Children.Add(MakeButton(t("openDefaultApps"), async (_, _) => await OpenDefaultSettingsAsync(), true));
-        AddHeaderElement(actions);
-
-        AddSectionLabel(t("formats"));
-        AddFormatRows(_state.SelectedKind);
+        AddFileKindOverview(_state.SelectedKind);
 
         if (_state.SelectedFormat is not null)
         {
             AddSelectedFormatPanel(_state.SelectedFormat);
-            AddCandidateApps(_state.SelectedFormat);
         }
         else
         {
             AddNoFormatSelectedPanel();
         }
 
+        AddSectionLabel(t("formatDistribution"));
+        AddFormatRows(_state.SelectedKind);
+
         AddTechnicalItems(_state.SelectedKind.Items);
+    }
+
+    private void AddFileKindOverview(FileKindSummary kind)
+    {
+        var root = new Grid();
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = t("fileKind"),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = kind.DisplayName,
+            FontSize = 26,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = FormatKindSummary(kind),
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Margin = new Thickness(0, 5, 0, 0)
+        });
+        root.Children.Add(titleStack);
+
+        var right = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        right.Children.Add(MakeBadgeGroup(BuildAppBadges(kind), new Thickness(0, 0, 14, 0)));
+        right.Children.Add(MakeButton(t("openDefaultApps"), async (_, _) => await OpenDefaultSettingsAsync()));
+        Grid.SetColumn(right, 1);
+        root.Children.Add(right);
+
+        DetailHeaderPanel.Children.Add(root);
+    }
+
+    private FrameworkElement MakeBadgeGroup(IReadOnlyCollection<AppIconBadge> badges, Thickness margin)
+    {
+        var stack = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = margin,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        foreach (var badge in badges)
+        {
+            stack.Children.Add(MakeAppBadge(badge));
+        }
+
+        return stack;
+    }
+
+    private FrameworkElement MakeAppBadge(AppIconBadge badge)
+    {
+        var holder = new Border
+        {
+            Width = 30,
+            Height = 30,
+            Margin = new Thickness(4, 0, 0, 0),
+            Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(216, 222, 230)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            ToolTip = badge.Label
+        };
+
+        if (badge.IsOverflow)
+        {
+            holder.Child = new TextBlock
+            {
+                Text = badge.Initial,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(99, 112, 128)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            return holder;
+        }
+
+        holder.Child = badge.Icon is null
+            ? MakeGenericAppGlyph(13)
+            : new Image
+            {
+                Source = badge.Icon,
+                Width = 20,
+                Height = 20,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+        return holder;
     }
 
     private async Task SelectFirstFormatIfNeededAsync()
@@ -341,12 +439,21 @@ public partial class MainWindow : Window
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        AddWorkSectionLabel(t("formatActions"));
+        var shell = new Grid();
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var header = new Grid { Margin = new Thickness(0, 8, 0, 10) };
+        var context = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 22, 0)
+        };
+        AddWorkSectionLabel(context, t("formatActions"));
+        var header = new Grid { Margin = new Thickness(0, 8, 0, 8) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
         var extensionBadge = new Border
         {
             Background = new SolidColorBrush(Color.FromRgb(255, 254, 250)),
@@ -384,42 +491,62 @@ public partial class MainWindow : Window
         });
         Grid.SetColumn(titleStack, 1);
         header.Children.Add(titleStack);
-        FormatWorkPanel.Children.Add(header);
+        context.Children.Add(header);
 
         if (_state.SelectedCandidate is not null)
         {
-            FormatWorkPanel.Children.Add(new TextBlock
+            context.Children.Add(new TextBlock
             {
                 Text = t("selectedApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
                 Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 10)
+                Margin = new Thickness(0, 0, 0, 6)
             });
         }
+        AddWorkMuted(context, t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))), new Thickness(0));
+        shell.Children.Add(context);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-        actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
-        actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
-        FormatWorkPanel.Children.Add(actions);
-
-        AddWorkMuted(t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))));
-    }
-
-    private void AddCandidateApps(FormatCandidateResult format)
-    {
-        AddWorkSectionLabel(t("availableApps"));
-
+        var candidates = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 16, 0)
+        };
+        AddWorkSectionLabel(candidates, t("availableApps"));
         if (format.Candidates.Count == 0)
         {
-            AddWorkMuted(t("noCandidateApps"));
-            return;
+            AddWorkMuted(candidates, t("noCandidateApps"), new Thickness(0, 8, 0, 0));
+        }
+        else
+        {
+            var wrap = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            foreach (var candidate in format.Candidates)
+            {
+                wrap.Children.Add(MakeCandidateButton(candidate));
+            }
+
+            candidates.Children.Add(wrap);
         }
 
-        foreach (var candidate in format.Candidates)
+        Grid.SetColumn(candidates, 1);
+        shell.Children.Add(candidates);
+
+        var actions = new StackPanel
         {
-            var row = MakeCandidateButton(candidate);
-            FormatWorkPanel.Children.Add(row);
-        }
+            Orientation = Orientation.Vertical,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var primaryAction = MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true);
+        primaryAction.MinWidth = 160;
+        primaryAction.Margin = new Thickness(0, 0, 0, 8);
+        var copyAction = MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension));
+        copyAction.MinWidth = 160;
+        copyAction.Margin = new Thickness(0);
+        actions.Children.Add(primaryAction);
+        actions.Children.Add(copyAction);
+        Grid.SetColumn(actions, 3);
+        shell.Children.Add(actions);
+        FormatWorkPanel.Children.Add(shell);
     }
 
     private void AddNoFormatSelectedPanel()
@@ -477,7 +604,8 @@ public partial class MainWindow : Window
         var button = new Button
         {
             Style = (Style)FindResource("BaseButton"),
-            Margin = new Thickness(0, 0, 0, 8),
+            Width = 166,
+            Margin = new Thickness(0, 0, 8, 8),
             Padding = new Thickness(12, 10, 12, 10),
             MinHeight = 46,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -787,29 +915,6 @@ public partial class MainWindow : Window
         });
     }
 
-    private void AddSummary(string text)
-    {
-        AddHeaderElement(new TextBlock
-        {
-            Text = text,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 2)
-        });
-    }
-
-    private void AddEyebrow(string text)
-    {
-        AddHeaderElement(new TextBlock
-        {
-            Text = text.ToUpperInvariant(),
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-    }
-
     private void AddHeaderElement(UIElement element)
     {
         DetailHeaderPanel.Children.Add(element);
@@ -829,7 +934,12 @@ public partial class MainWindow : Window
 
     private void AddWorkSectionLabel(string text)
     {
-        FormatWorkPanel.Children.Add(new TextBlock
+        AddWorkSectionLabel(FormatWorkPanel, text);
+    }
+
+    private static void AddWorkSectionLabel(Panel panel, string text)
+    {
+        panel.Children.Add(new TextBlock
         {
             Text = text,
             FontSize = 12,
@@ -852,12 +962,17 @@ public partial class MainWindow : Window
 
     private void AddWorkMuted(string text)
     {
-        FormatWorkPanel.Children.Add(new TextBlock
+        AddWorkMuted(FormatWorkPanel, text, new Thickness(0, 0, 0, 8));
+    }
+
+    private static void AddWorkMuted(Panel panel, string text, Thickness margin)
+    {
+        panel.Children.Add(new TextBlock
         {
             Text = text,
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 8)
+            Margin = margin
         });
     }
 
