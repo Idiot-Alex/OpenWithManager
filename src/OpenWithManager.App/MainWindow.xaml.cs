@@ -149,10 +149,35 @@ public partial class MainWindow : Window
 
         var appCount = CountDistinctApps(kind);
         var appText = appCount <= 1
-            ? DisplayAppName(kind.PrimaryAppName)
+            ? DisplaySummaryAppName(kind.PrimaryAppName, kind)
             : t("appCount", ("count", appCount.ToString()));
 
         return $"{formatText} · {appText}";
+    }
+
+    private string DisplaySummaryAppName(string? name, FileKindSummary kind)
+    {
+        var displayName = DisplayAppName(name);
+        return IsFileKindName(displayName, kind) ? t("defaultAppSet") : displayName;
+    }
+
+    private static bool IsFileKindName(string name, FileKindSummary kind)
+    {
+        var normalizedName = NormalizeLabel(name);
+        return normalizedName == NormalizeLabel(kind.DisplayName)
+            || normalizedName == NormalizeLabel(kind.Description)
+            || normalizedName == NormalizeLabel(kind.ShortName);
+    }
+
+    private static string NormalizeLabel(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        var normalized = new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        return normalized.EndsWith('s') ? normalized[..^1] : normalized;
     }
 
     private static int CountDistinctApps(FileKindSummary kind)
@@ -171,7 +196,7 @@ public partial class MainWindow : Window
             .GroupBy(item => DisplayAppKey(item.FriendlyName ?? item.ProgId), StringComparer.OrdinalIgnoreCase)
             .Select(group => new
             {
-                AppName = DisplayAppName(group.First().FriendlyName ?? group.First().ProgId),
+                AppName = DisplaySummaryAppName(group.First().FriendlyName ?? group.First().ProgId, kind),
                 Count = group.Count(),
                 Icon = group.Select(item => item.Icon).FirstOrDefault(icon => icon is not null)
             })

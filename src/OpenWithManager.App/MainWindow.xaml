@@ -154,7 +154,7 @@
                                             <DataTemplate>
                                                 <Border Width="26"
                                                         Height="26"
-                                                        Margin="-4,0,0,0"
+                                                        Margin="4,0,0,0"
                                                         Background="{StaticResource SurfaceBrush}"
                                                         BorderBrush="{StaticResource LineBrush}"
                                                         BorderThickness="1"
