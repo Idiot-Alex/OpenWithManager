@@ -987,12 +987,22 @@ public partial class MainWindow : Window
     private void OnPreferencesClicked(object sender, RoutedEventArgs e)
     {
         SyncPreferencesPanel();
-        PreferencesPanel.Visibility = Visibility.Visible;
+        PreferencesOverlay.Visibility = Visibility.Visible;
     }
 
     private void OnClosePreferencesClicked(object sender, RoutedEventArgs e)
     {
-        PreferencesPanel.Visibility = Visibility.Collapsed;
+        ClosePreferences();
+    }
+
+    private void OnPreferencesOverlayMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        ClosePreferences();
+    }
+
+    private void ClosePreferences()
+    {
+        PreferencesOverlay.Visibility = Visibility.Collapsed;
     }
 
     private void OnSettingsLanguageClicked(object sender, RoutedEventArgs e)
