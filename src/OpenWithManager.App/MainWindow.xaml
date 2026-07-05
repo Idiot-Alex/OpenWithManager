@@ -231,9 +231,26 @@
                     <Border Grid.Row="1"
                             BorderBrush="{StaticResource LineBrush}"
                             BorderThickness="0,1,0,0">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel x:Name="DetailPanel" Margin="24,18,24,24" />
-                        </ScrollViewer>
+                        <Grid Margin="24,18,24,24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.15*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="0.85*" />
+                            </Grid.ColumnDefinitions>
+
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="DetailPanel" />
+                            </ScrollViewer>
+
+                            <Border Grid.Column="2"
+                                    BorderBrush="{StaticResource LineBrush}"
+                                    BorderThickness="1,0,0,0"
+                                    Padding="18,0,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel x:Name="FormatWorkPanel" />
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

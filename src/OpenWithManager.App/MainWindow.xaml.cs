@@ -246,6 +246,7 @@ public partial class MainWindow : Window
         EmptyText.Visibility = Visibility.Collapsed;
         DetailHeaderPanel.Children.Clear();
         DetailPanel.Children.Clear();
+        FormatWorkPanel.Children.Clear();
         AddTitle(t("readingDefaultsTitle"));
         AddHeaderMuted(t("readingDefaultsBody"));
     }
@@ -254,6 +255,7 @@ public partial class MainWindow : Window
     {
         DetailHeaderPanel.Children.Clear();
         DetailPanel.Children.Clear();
+        FormatWorkPanel.Children.Clear();
 
         if (_state.LoadError is not null)
         {
@@ -285,6 +287,10 @@ public partial class MainWindow : Window
             AddSelectedFormatPanel(_state.SelectedFormat);
             AddCandidateApps(_state.SelectedFormat);
         }
+        else
+        {
+            AddNoFormatSelectedPanel();
+        }
 
         AddTechnicalItems(_state.SelectedKind.Items);
     }
@@ -311,8 +317,8 @@ public partial class MainWindow : Window
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        AddSectionLabel(t("selectedFormat"));
-        DetailPanel.Children.Add(new TextBlock
+        AddWorkSectionLabel(t("selectedFormat"));
+        FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = FormatExtensionLabel(format.Extension),
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
@@ -320,14 +326,14 @@ public partial class MainWindow : Window
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 8, 0, 2)
         });
-        DetailPanel.Children.Add(new TextBlock
+        FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = item?.Description ?? format.Description,
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 4)
         });
-        DetailPanel.Children.Add(new TextBlock
+        FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))),
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
@@ -336,7 +342,7 @@ public partial class MainWindow : Window
         });
         if (_state.SelectedCandidate is not null)
         {
-            DetailPanel.Children.Add(new TextBlock
+            FormatWorkPanel.Children.Add(new TextBlock
             {
                 Text = t("targetApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
                 Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
@@ -348,26 +354,38 @@ public partial class MainWindow : Window
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
         actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
         actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
-        DetailPanel.Children.Add(actions);
+        FormatWorkPanel.Children.Add(actions);
 
-        AddMuted(t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))));
+        AddWorkMuted(t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))));
     }
 
     private void AddCandidateApps(FormatCandidateResult format)
     {
-        AddSectionLabel(t("availableApps"));
+        AddWorkSectionLabel(t("availableApps"));
 
         if (format.Candidates.Count == 0)
         {
-            AddMuted(t("noCandidateApps"));
+            AddWorkMuted(t("noCandidateApps"));
             return;
         }
 
         foreach (var candidate in format.Candidates)
         {
             var row = MakeCandidateButton(candidate);
-            DetailPanel.Children.Add(row);
+            FormatWorkPanel.Children.Add(row);
         }
+    }
+
+    private void AddNoFormatSelectedPanel()
+    {
+        AddWorkSectionLabel(t("selectedFormat"));
+        FormatWorkPanel.Children.Add(new TextBlock
+        {
+            Text = t("pickFormat"),
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0)
+        });
     }
 
     private Button MakeCandidateButton(FormatAppCandidate candidate)
@@ -649,9 +667,9 @@ public partial class MainWindow : Window
     private static Grid MakeFormatRowGrid()
     {
         var content = new Grid();
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
         return content;
     }
 
@@ -678,6 +696,7 @@ public partial class MainWindow : Window
         var app = new Grid();
         app.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         app.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        app.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         app.Children.Add(MakeAppIcon(icon, appName, 24, 16, new Thickness(0, 0, 8, 0)));
 
         var appNameText = new TextBlock
@@ -689,6 +708,20 @@ public partial class MainWindow : Window
         };
         Grid.SetColumn(appNameText, 1);
         app.Children.Add(appNameText);
+        if (isSelected)
+        {
+            var selectedLabel = new TextBlock
+            {
+                Text = t("selected"),
+                Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(selectedLabel, 2);
+            app.Children.Add(selectedLabel);
+        }
 
         Grid.SetColumn(descriptionText, 1);
         Grid.SetColumn(app, 2);
@@ -763,9 +796,32 @@ public partial class MainWindow : Window
         });
     }
 
+    private void AddWorkSectionLabel(string text)
+    {
+        FormatWorkPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Margin = new Thickness(0, 8, 0, 0)
+        });
+    }
+
     private void AddMuted(string text)
     {
         DetailPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+    }
+
+    private void AddWorkMuted(string text)
+    {
+        FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = text,
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
