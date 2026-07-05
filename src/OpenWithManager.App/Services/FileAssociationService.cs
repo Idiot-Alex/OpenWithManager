@@ -39,8 +39,6 @@ public sealed class FileAssociationService
         new(".py", "Code", "Python source file")
     ];
 
-    public bool UseDeveloperFormatView { get; set; }
-
     public List<FileAssociationItem> GetKnownAssociations()
     {
         return GetKnownExtensions()
@@ -75,9 +73,7 @@ public sealed class FileAssociationService
             yield return extension;
         }
 
-        yield return UseDeveloperFormatView
-            ? new KnownExtension(".ts", "Code", "TypeScript file")
-            : new KnownExtension(".ts", "Video", "MPEG transport stream video");
+        yield return new KnownExtension(".ts", "Video", "MPEG transport stream video");
     }
 
     private static string? ReadUserChoice(string extension)

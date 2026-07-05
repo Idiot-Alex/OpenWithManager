@@ -352,29 +352,6 @@
                                             Click="OnEnglishLanguageClicked" />
                                 </StackPanel>
                             </Grid>
-                            <Grid Margin="0,0,0,14">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,18,0">
-                                    <TextBlock x:Name="FormatViewLabel"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource InkBrush}" />
-                                    <TextBlock x:Name="FormatViewHint"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               TextWrapping="Wrap"
-                                               Margin="0,3,0,0" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="WindowsFormatButton"
-                                            Style="{StaticResource PrimaryButton}"
-                                            Click="OnWindowsFormatViewClicked" />
-                                    <Button x:Name="DeveloperFormatButton"
-                                            Style="{StaticResource IconButton}"
-                                            Click="OnDeveloperFormatViewClicked" />
-                                </StackPanel>
-                            </Grid>
                             <CheckBox x:Name="ShowTechnicalDetailsCheckBox"
                                       Style="{StaticResource AppCheckBox}"
                                       Margin="0,0,0,10"

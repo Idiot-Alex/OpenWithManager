@@ -7,6 +7,156 @@
     <SolidColorBrush x:Key="LineBrush" Color="#d8dee6" />
     <SolidColorBrush x:Key="HoverBrush" Color="#f3f6f8" />
     <SolidColorBrush x:Key="SelectedBrush" Color="#e8eef3" />
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#6f7d8a" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#5d6b78" />
+    <SolidColorBrush x:Key="ScrollThumbActiveBrush" Color="#485563" />
+
+    <Style x:Key="ScrollPageButtonStyle" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Opacity" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollThumbStyle" TargetType="Thumb">
+        <Setter Property="MinWidth" Value="6" />
+        <Setter Property="MinHeight" Value="6" />
+        <Setter Property="Background" Value="{StaticResource ScrollThumbBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbRoot"
+                            Margin="1.5"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbRoot" Property="Background" Value="{StaticResource ScrollThumbHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbRoot" Property="Background" Value="{StaticResource ScrollThumbActiveBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="VerticalOverlayScrollBarTemplate" TargetType="ScrollBar">
+        <Grid Background="Transparent" SnapsToDevicePixels="True">
+            <Track x:Name="PART_Track"
+                   Orientation="Vertical"
+                   IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                  Style="{StaticResource ScrollPageButtonStyle}" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb MinHeight="32"
+                           Style="{StaticResource ScrollThumbStyle}" />
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                  Style="{StaticResource ScrollPageButtonStyle}" />
+                </Track.IncreaseRepeatButton>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="HorizontalOverlayScrollBarTemplate" TargetType="ScrollBar">
+        <Grid Background="Transparent" SnapsToDevicePixels="True">
+            <Track x:Name="PART_Track"
+                   Orientation="Horizontal">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageLeftCommand"
+                                  Style="{StaticResource ScrollPageButtonStyle}" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb MinWidth="32"
+                           Style="{StaticResource ScrollThumbStyle}" />
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Command="ScrollBar.PageRightCommand"
+                                  Style="{StaticResource ScrollPageButtonStyle}" />
+                </Track.IncreaseRepeatButton>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <Style TargetType="ScrollBar">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="Auto" />
+        <Setter Property="MinWidth" Value="8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Opacity" Value="0.28" />
+        <Setter Property="Template" Value="{StaticResource VerticalOverlayScrollBarTemplate}" />
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="8" />
+                <Setter Property="Template" Value="{StaticResource HorizontalOverlayScrollBarTemplate}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="ScrollViewer">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid x:Name="OverlayRoot"
+                          Background="Transparent"
+                          ClipToBounds="True">
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                Content="{TemplateBinding Content}"
+                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}" />
+
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Stretch"
+                                   Margin="0,4,2,4"
+                                   Orientation="Vertical"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                   Opacity="0" />
+
+                        <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                   HorizontalAlignment="Stretch"
+                                   VerticalAlignment="Bottom"
+                                   Margin="4,0,4,2"
+                                   Orientation="Horizontal"
+                                   Maximum="{TemplateBinding ScrollableWidth}"
+                                   Value="{TemplateBinding HorizontalOffset}"
+                                   ViewportSize="{TemplateBinding ViewportWidth}"
+                                   Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                                   Opacity="0" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PART_VerticalScrollBar" Property="Opacity" Value="0.72" />
+                            <Setter TargetName="PART_HorizontalScrollBar" Property="Opacity" Value="0.72" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="PART_VerticalScrollBar" Property="Opacity" Value="0.72" />
+                            <Setter TargetName="PART_HorizontalScrollBar" Property="Opacity" Value="0.72" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <Style x:Key="BaseButton" TargetType="Button">
         <Setter Property="MinHeight" Value="36" />
@@ -129,6 +279,7 @@
                             BorderThickness="1"
                             CornerRadius="6">
                         <ScrollViewer x:Name="PART_ContentHost"
+                                      Style="{x:Null}"
                                       Margin="{TemplateBinding Padding}" />
                     </Border>
                 </ControlTemplate>

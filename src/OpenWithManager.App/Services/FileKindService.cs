@@ -4,19 +4,8 @@ namespace OpenWithManager.App.Services;
 
 public sealed class FileKindService
 {
-    private readonly FileAssociationService _fileAssociations;
-
-    private static FileKindProfile[] GetProfiles(bool useDeveloperFormatView)
-    {
-        var videoExtensions = useDeveloperFormatView
-            ? new[] { ".mp4", ".mov", ".mkv" }
-            : new[] { ".mp4", ".mov", ".mkv", ".ts" };
-        var codeExtensions = useDeveloperFormatView
-            ? new[] { ".json", ".js", ".ts", ".cs", ".py" }
-            : new[] { ".json", ".js", ".cs", ".py" };
-
-        return
-        [
+    private static readonly FileKindProfile[] Profiles =
+    [
         new(
             "images",
             "Photos and images",
@@ -28,7 +17,7 @@ public sealed class FileKindService
             "Videos",
             "Videos",
             "Movies, clips, and screen recordings.",
-            videoExtensions),
+            [".mp4", ".mov", ".mkv", ".ts"]),
         new(
             "music",
             "Music and audio",
@@ -76,27 +65,28 @@ public sealed class FileKindService
             "Code files",
             "Code",
             "Developer files that usually open in an editor.",
-            codeExtensions),
+            [".json", ".js", ".cs", ".py"]),
         new(
             "web",
             "Web pages",
             "Web",
             "HTML files and pages saved from the web.",
             [".html", ".htm"])
-        ];
-    }
+    ];
+
+    private readonly FileAssociationService _fileAssociations;
 
     public FileKindService(FileAssociationService fileAssociations)
     {
         _fileAssociations = fileAssociations;
     }
 
-    public List<FileKindSummary> GetFileKinds(bool useDeveloperFormatView)
+    public List<FileKindSummary> GetFileKinds()
     {
         var associations = _fileAssociations.GetKnownAssociations();
         var byExtension = associations.ToDictionary(item => item.Extension, StringComparer.OrdinalIgnoreCase);
 
-        return GetProfiles(useDeveloperFormatView)
+        return Profiles
             .Select(profile => BuildSummary(profile, byExtension))
             .OrderBy(StatusPriority)
             .ThenBy(summary => summary.DisplayName)

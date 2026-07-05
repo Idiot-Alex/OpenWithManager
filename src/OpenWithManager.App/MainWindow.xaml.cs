@@ -58,9 +58,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var useDeveloperFormatView = _preferences.UseDeveloperFormatView;
-            _fileAssociations.UseDeveloperFormatView = useDeveloperFormatView;
-            var kinds = await Task.Run(() => _fileKinds.GetFileKinds(useDeveloperFormatView));
+            var kinds = await Task.Run(() => _fileKinds.GetFileKinds());
             _state.AllKinds = kinds;
             _state.SelectedKind = _state.SelectedKind is null
                 ? _state.AllKinds.FirstOrDefault()
@@ -1169,31 +1167,6 @@ public partial class MainWindow : Window
         SyncPreferencesPanel();
     }
 
-    private async void OnWindowsFormatViewClicked(object sender, RoutedEventArgs e)
-    {
-        await SetDeveloperFormatViewAsync(false);
-    }
-
-    private async void OnDeveloperFormatViewClicked(object sender, RoutedEventArgs e)
-    {
-        await SetDeveloperFormatViewAsync(true);
-    }
-
-    private async Task SetDeveloperFormatViewAsync(bool enabled)
-    {
-        if (_preferences.UseDeveloperFormatView == enabled)
-        {
-            SyncPreferencesPanel();
-            return;
-        }
-
-        _preferences.UseDeveloperFormatView = enabled;
-        SavePreferences();
-        ClearSelectedFormat();
-        await LoadFileKindsAsync();
-        SyncPreferencesPanel();
-    }
-
     private void OnShowTechnicalDetailsClicked(object sender, RoutedEventArgs e)
     {
         _preferences.ShowTechnicalDetails = ShowTechnicalDetailsCheckBox.IsChecked == true;
@@ -1252,12 +1225,6 @@ public partial class MainWindow : Window
         EnglishLanguageButton.Content = t("english");
         ChineseLanguageButton.Style = (Style)FindResource(_text.IsChinese ? "PrimaryButton" : "IconButton");
         EnglishLanguageButton.Style = (Style)FindResource(_text.IsChinese ? "IconButton" : "PrimaryButton");
-        FormatViewLabel.Text = t("formatView");
-        FormatViewHint.Text = t("formatViewHint");
-        WindowsFormatButton.Content = t("formatViewWindows");
-        DeveloperFormatButton.Content = t("formatViewDeveloper");
-        WindowsFormatButton.Style = (Style)FindResource(_preferences.UseDeveloperFormatView ? "IconButton" : "PrimaryButton");
-        DeveloperFormatButton.Style = (Style)FindResource(_preferences.UseDeveloperFormatView ? "PrimaryButton" : "IconButton");
         ShowTechnicalDetailsCheckBox.Content = t("showTechnicalDetails");
         ShowTechnicalDetailsCheckBox.IsChecked = _preferences.ShowTechnicalDetails;
         CandidateSourcesCheckBox.Content = t("showCandidateSources");
