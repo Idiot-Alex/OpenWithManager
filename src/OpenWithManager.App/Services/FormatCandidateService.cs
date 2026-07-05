@@ -27,7 +27,7 @@ public sealed class FormatCandidateService
             candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,
                 currentItem.ProgId,
-                FileAssociationService.ReadIconLocation(currentItem.ProgId),
+                currentItem.Icon,
                 "Current",
                 true));
         }
@@ -168,7 +168,7 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
-                FileAssociationService.ReadIconLocation(progId),
+                FileAssociationService.ReadRegisteredApplicationIconLocation(hive, capabilitiesPath, progId),
                 "RegisteredApplication",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase),
                 settingsParameterName,

@@ -754,8 +754,7 @@ public partial class MainWindow : Window
         grid.Margin = new Thickness(0, 0, 0, 6);
         AddTechnicalCell(grid, t("technicalFormat"), 0, true);
         AddTechnicalCell(grid, t("technicalCurrentApp"), 1, true);
-        AddTechnicalCell(grid, t("technicalProgId"), 2, true);
-        AddTechnicalCell(grid, t("technicalSource"), 3, true);
+        AddTechnicalCell(grid, t("technicalSource"), 2, true);
         return grid;
     }
 
@@ -765,8 +764,7 @@ public partial class MainWindow : Window
         grid.Margin = new Thickness(0, 0, 0, 6);
         AddTechnicalCell(grid, FormatExtensionLabel(item.Extension), 0, false);
         AddTechnicalCell(grid, DisplayAppName(item.FriendlyName ?? item.ProgId), 1, false);
-        AddTechnicalCell(grid, item.ProgId ?? t("none"), 2, false);
-        AddTechnicalCell(grid, TechnicalSourceLabel(item.Source), 3, false);
+        AddTechnicalCell(grid, TechnicalSourceLabel(item.Source), 2, false);
         return grid;
     }
 
@@ -774,7 +772,6 @@ public partial class MainWindow : Window
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
         return grid;

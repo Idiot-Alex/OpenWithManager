@@ -60,7 +60,7 @@ public sealed class FileAssociationService
                     extension.Description,
                     progId,
                     appName,
-                    progId is null ? null : ReadIconLocation(progId),
+                    ReadCurrentAppIconLocation(extension.Extension, progId),
                     userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
@@ -132,10 +132,16 @@ public sealed class FileAssociationService
 
     private static string? ReadAssociationString(string extension, AssocString value)
     {
+        var text = ReadRawAssociationString(extension, value);
+        return string.IsNullOrWhiteSpace(text) ? null : ResolveDisplayName(text);
+    }
+
+    private static string? ReadRawAssociationString(string extension, AssocString value)
+    {
         var length = 1024u;
         var buffer = new StringBuilder((int)length);
         var result = AssocQueryString(AssocFlags.None, value, extension, null, buffer, ref length);
-        return result >= 0 && buffer.Length > 0 ? ResolveDisplayName(buffer.ToString()) : null;
+        return result >= 0 && buffer.Length > 0 ? buffer.ToString() : null;
     }
 
     private static string? ReadDisplayAppName(string extension, string description, string progId)
@@ -210,8 +216,17 @@ public sealed class FileAssociationService
             return null;
         }
 
-        return ReadRegistryIconLocation($@"{progId}\DefaultIcon")
-            ?? ReadRegistryOpenCommandIconLocation($@"{progId}\shell\open\command");
+        return ReadRegistryApplicationIconLocation($@"{progId}\Application")
+            ?? ReadRegistryOpenCommandIconLocation($@"{progId}\shell\open\command")
+            ?? ReadRegistryIconLocation($@"{progId}\DefaultIcon");
+    }
+
+    public static AppIconLocation? ReadCurrentAppIconLocation(string extension, string? progId)
+    {
+        return ParseIconLocation(ReadRawAssociationString(extension, AssocString.AppIconReference))
+            ?? ParseCommandLocation(ReadRawAssociationString(extension, AssocString.Executable))
+            ?? ReadIconLocation(progId)
+            ?? ParseIconLocation(ReadRawAssociationString(extension, AssocString.DefaultIcon));
     }
 
     public static AppIconLocation? ReadApplicationIconLocation(string executableName)
@@ -221,16 +236,30 @@ public sealed class FileAssociationService
             return null;
         }
 
-        return ReadRegistryIconLocation($@"Applications\{executableName}\DefaultIcon")
+        return ReadRegistryApplicationIconLocation($@"Applications\{executableName}\Application")
             ?? ReadRegistryOpenCommandIconLocation($@"Applications\{executableName}\shell\open\command")
             ?? ReadAppPathIconLocation(Registry.CurrentUser, executableName)
-            ?? ReadAppPathIconLocation(Registry.LocalMachine, executableName);
+            ?? ReadAppPathIconLocation(Registry.LocalMachine, executableName)
+            ?? ReadRegistryIconLocation($@"Applications\{executableName}\DefaultIcon");
+    }
+
+    public static AppIconLocation? ReadRegisteredApplicationIconLocation(RegistryKey hive, string capabilitiesPath, string? progId)
+    {
+        using var capabilities = hive.OpenSubKey(capabilitiesPath);
+        return ParseIconLocation(capabilities?.GetValue("ApplicationIcon") as string)
+            ?? ReadIconLocation(progId);
     }
 
     private static AppIconLocation? ReadRegistryIconLocation(string keyPath)
     {
         using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
         return ParseIconLocation(key?.GetValue(null) as string);
+    }
+
+    private static AppIconLocation? ReadRegistryApplicationIconLocation(string keyPath)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
+        return ParseIconLocation(key?.GetValue("ApplicationIcon") as string);
     }
 
     private static AppIconLocation? ReadRegistryOpenCommandIconLocation(string keyPath)
@@ -252,7 +281,12 @@ public sealed class FileAssociationService
             return null;
         }
 
-        var text = Environment.ExpandEnvironmentVariables(value.Trim());
+        var text = NormalizeIconLocationText(value);
+        if (string.IsNullOrWhiteSpace(text) || text.StartsWith("@{", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
         var path = text;
         var index = 0;
         if (text.StartsWith('"'))
@@ -276,6 +310,14 @@ public sealed class FileAssociationService
 
         path = path.Trim().Trim('"');
         return string.IsNullOrWhiteSpace(path) ? null : new AppIconLocation(path, index);
+    }
+
+    private static string NormalizeIconLocationText(string value)
+    {
+        var text = Environment.ExpandEnvironmentVariables(value.Trim());
+        return text.StartsWith('@') && !text.StartsWith("@{", StringComparison.Ordinal)
+            ? text[1..].Trim()
+            : text;
     }
 
     private static AppIconLocation? ParseCommandLocation(string? value)
@@ -334,7 +376,9 @@ public sealed class FileAssociationService
         Executable = 2,
         FriendlyDocName = 3,
         FriendlyAppName = 4,
-        ProgId = 20
+        DefaultIcon = 15,
+        ProgId = 20,
+        AppIconReference = 24
     }
 
     private sealed record KnownExtension(string Extension, string Category, string Description);
