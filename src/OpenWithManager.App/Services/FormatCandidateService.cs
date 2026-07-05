@@ -158,7 +158,7 @@ public sealed class FormatCandidateService
                 continue;
             }
 
-            var appName = capabilities?.GetValue("ApplicationName") as string
+            var appName = FileAssociationService.ResolveDisplayName(capabilities?.GetValue("ApplicationName") as string)
                 ?? FileAssociationService.ReadFriendlyName(progId)
                 ?? valueName;
 
@@ -176,7 +176,7 @@ public sealed class FormatCandidateService
     private static string? ReadApplicationName(string executableName)
     {
         using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{executableName}\Application");
-        return key?.GetValue("ApplicationName") as string;
+        return FileAssociationService.ResolveDisplayName(key?.GetValue("ApplicationName") as string);
     }
 
     private static string CandidateKey(FormatAppCandidate candidate)

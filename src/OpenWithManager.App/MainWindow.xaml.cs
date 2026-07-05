@@ -608,10 +608,10 @@ public partial class MainWindow : Window
 
     private string t(string key, params (string Key, string Value)[] values)
     {
-        var text = (_isChinese ? Zh : En).TryGetValue(key, out var value) ? value : key;
-        foreach (var (name, value) in values)
+        var text = (_isChinese ? Zh : En).TryGetValue(key, out var template) ? template : key;
+        foreach (var (name, replacement) in values)
         {
-            text = text.Replace($"{{{name}}}", value);
+            text = text.Replace($"{{{name}}}", replacement);
         }
         return text;
     }

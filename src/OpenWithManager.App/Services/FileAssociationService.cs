@@ -1,5 +1,6 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
@@ -86,15 +87,32 @@ public sealed class FileAssociationService
         }
 
         using var applicationKey = Registry.ClassesRoot.OpenSubKey($@"{progId}\Application");
-        var appName = applicationKey?.GetValue("ApplicationName") as string;
+        var appName = ResolveDisplayName(applicationKey?.GetValue("ApplicationName") as string);
         if (!string.IsNullOrWhiteSpace(appName))
         {
             return appName;
         }
 
         using var progIdKey = Registry.ClassesRoot.OpenSubKey(progId);
-        var defaultName = progIdKey?.GetValue(null) as string;
+        var defaultName = ResolveDisplayName(progIdKey?.GetValue(null) as string);
         return string.IsNullOrWhiteSpace(defaultName) ? progId : defaultName;
+    }
+
+    public static string? ResolveDisplayName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!value.TrimStart().StartsWith('@'))
+        {
+            return value;
+        }
+
+        var buffer = new StringBuilder(512);
+        var result = SHLoadIndirectString(value, buffer, (uint)buffer.Capacity, IntPtr.Zero);
+        return result >= 0 && buffer.Length > 0 ? buffer.ToString() : value;
     }
 
     public static string? ReadIconDataUrl(string? progId)
@@ -223,6 +241,13 @@ public sealed class FileAssociationService
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr icon);
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHLoadIndirectString(
+        string source,
+        StringBuilder output,
+        uint outputLength,
+        IntPtr reserved);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct ShFileInfo
