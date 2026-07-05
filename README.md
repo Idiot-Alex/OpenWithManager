@@ -4,9 +4,8 @@ A Windows desktop MVP for viewing and managing file default app associations.
 
 This project uses:
 
-- WPF for the native Windows host
-- WebView2 for the HTML/CSS/JavaScript interface
-- C# services for registry reads, Windows Settings launch, export, and import comparison
+- WPF/XAML for the native Windows interface
+- C# services for registry reads, Shell association handler discovery, Windows Settings launch, export, and import comparison
 
 ## Current MVP
 
@@ -14,17 +13,18 @@ This project uses:
 - Search by extension, category, app name, or ProgID
 - Filter by file type
 - Open Windows default apps settings
+- Show candidate apps for a selected file format
+- Set a default app only after an explicit user confirmation, using Windows Shell association APIs
 - Export a JSON snapshot of current associations
 - Import a JSON snapshot and compare it with the current machine
 
-The first version intentionally does not force-write default app associations. Windows 10/11 protects default app choices, and direct registry writes can be ignored or reset by the OS.
+The app must not silently or forcibly change default app associations. Windows 10/11 protects default app choices, and direct registry writes can be ignored or reset by the OS. Any default app change should be user-initiated, confirmed in the UI, and performed through supported Windows Shell or Settings flows.
 
 ## Requirements
 
 - Windows 10 or Windows 11
 - Visual Studio 2022 with .NET desktop development workload
 - .NET 8 SDK
-- WebView2 Runtime
 
 ## Run
 
@@ -45,16 +45,15 @@ src/OpenWithManager.App/
   MainWindow.xaml.cs
   Models/
   Services/
-  Web/
-    index.html
-    styles.css
-    app.js
+  Resources/
+    Styles.xaml
+  ViewModels/
 ```
 
 ## Next Good Features
 
 - Add custom extension tracking
-- Add installed app discovery
+- Improve installed app discovery
 - Add safer per-extension help text
 - Add system restore point reminder before advanced changes
-- Add optional automatic repair only for associations that can be changed safely
+- Add clearer before/after review for user-confirmed association changes

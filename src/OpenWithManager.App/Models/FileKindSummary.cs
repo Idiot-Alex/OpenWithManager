@@ -11,6 +11,7 @@ public sealed record FileKindSummary(
     AppIconLocation? PrimaryIcon,
     int MatchingFormats,
     int TotalFormats,
-    string Status,
+    FileKindStatus Status,
+    string StatusText,
     IReadOnlyCollection<FileKindOutlier> Outliers,
     IReadOnlyCollection<FileAssociationItem> Items);

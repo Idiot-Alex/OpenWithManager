@@ -3,11 +3,12 @@
 ## Project Structure & Module Organization
 
 - `OpenWithManager.sln` is the solution entry point.
-- `src/OpenWithManager.App/` contains the WPF/WebView2 app project.
-- `MainWindow.xaml` and `MainWindow.xaml.cs` host the WPF shell and WebView2 bridge.
+- `src/OpenWithManager.App/` contains the WPF app project.
+- `MainWindow.xaml` and `MainWindow.xaml.cs` host the WPF shell and UI event flow.
 - `Models/` contains data types for associations and diffs.
-- `Services/` contains registry reads, Windows Settings launch logic, export, and import comparison.
-- `Web/` contains the embedded interface: `index.html`, `styles.css`, and `app.js`.
+- `Services/` contains registry reads, Shell association handler discovery, Windows Settings launch logic, export, and import comparison.
+- `Resources/` contains shared WPF styles.
+- `ViewModels/` contains UI state types.
 
 No test project exists yet. Add future tests under a parallel `tests/` directory, for example `tests/OpenWithManager.App.Tests/`.
 
@@ -22,7 +23,7 @@ dotnet run --project .\src\OpenWithManager.App\OpenWithManager.App.csproj
 dotnet test
 ```
 
-- `dotnet restore` downloads NuGet packages, including WebView2.
+- `dotnet restore` restores project dependencies.
 - `dotnet build` compiles the WPF application.
 - `dotnet run` starts the desktop app locally.
 - `dotnet test` is the expected command once a test project is added.
@@ -43,8 +44,8 @@ When adding tests, prefer focused unit tests for `Services/` behavior and small 
 
 The current history uses descriptive, sentence-style commit messages, for example: `Initial commit of OpenWith Manager application...`. Continue with concise summaries that explain the user-visible change.
 
-Pull requests should include a short description, manual verification steps, linked issues when applicable, and screenshots or screen recordings for UI changes. Call out Windows version, .NET SDK version, and WebView2-related behavior when relevant.
+Pull requests should include a short description, manual verification steps, linked issues when applicable, and screenshots or screen recordings for UI changes. Call out Windows version, .NET SDK version, and default-app or Shell association behavior when relevant.
 
 ## Security & Configuration Tips
 
-Do not force-write default app associations. Windows 10/11 protects these choices, and direct registry writes can be ignored or reset. Prefer read-only inspection, export/import comparison, and official Windows Settings pages.
+Do not silently or forcibly change default app associations. Windows 10/11 protects these choices, and direct registry writes can be ignored or reset. Prefer read-only inspection, export/import comparison, and official Windows Settings pages. When the app offers a default-app change, it must be clearly user-initiated, require explicit confirmation, and use supported Windows Shell or Settings flows rather than direct registry writes.

@@ -67,17 +67,25 @@ public partial class MainWindow : Window
     {
         var visible = _state.AllKinds
             .Where(MatchesFilter)
+            .Select(LocalizeKind)
             .ToList();
+        var selectedId = _state.SelectedKind?.Id;
+        var nextSelected = visible.Count == 0
+            ? null
+            : visible.FirstOrDefault(kind => kind.Id == selectedId) ?? visible.First();
+
+        if (nextSelected?.Id != selectedId)
+        {
+            _state.SelectedFormat = null;
+            _state.SelectedCandidate = null;
+        }
+
+        _state.SelectedKind = nextSelected;
 
         _visibleKinds.Clear();
         foreach (var kind in visible)
         {
             _visibleKinds.Add(kind);
-        }
-
-        if (_state.SelectedKind is null || !visible.Any(kind => kind.Id == _state.SelectedKind.Id))
-        {
-            _state.SelectedKind = visible.FirstOrDefault() ?? _state.AllKinds.FirstOrDefault();
         }
 
         KindList.SelectedItem = _state.SelectedKind;
@@ -90,7 +98,7 @@ public partial class MainWindow : Window
 
     private bool MatchesFilter(FileKindSummary kind)
     {
-        if (_state.Status == "Review" && kind.Status == "Consistent")
+        if (_state.Status == "Review" && kind.Status == FileKindStatus.Consistent)
         {
             return false;
         }
@@ -107,7 +115,8 @@ public partial class MainWindow : Window
             kind.Description,
             kind.PrimaryAppName,
             kind.PrimaryProgId,
-            kind.Status,
+            kind.Status.ToString(),
+            StatusLabel(kind.Status),
             string.Join(" ", kind.Extensions),
             string.Join(" ", kind.Items.SelectMany(item => new[]
             {
@@ -120,6 +129,21 @@ public partial class MainWindow : Window
         });
 
         return text.Contains(_state.Query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private FileKindSummary LocalizeKind(FileKindSummary kind)
+    {
+        return kind with { StatusText = StatusLabel(kind.Status) };
+    }
+
+    private string StatusLabel(FileKindStatus status)
+    {
+        return status switch
+        {
+            FileKindStatus.Mixed => t("mixedStatus"),
+            FileKindStatus.Missing => t("missingStatus"),
+            _ => t("consistentStatus")
+        };
     }
 
     private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindSummary> visible)
@@ -267,7 +291,8 @@ public partial class MainWindow : Window
             Text = DisplayAppName(candidate.AppName),
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
         Grid.SetColumn(name, 1);
         var source = new Border
@@ -411,8 +436,8 @@ public partial class MainWindow : Window
     {
         var text = kind.Status switch
         {
-            "Mixed" => kind.Outliers.Count == 1 ? t("oneException") : t("exceptionsCount", ("count", kind.Outliers.Count.ToString())),
-            "Missing" => t("noAppSet"),
+            FileKindStatus.Mixed => kind.Outliers.Count == 1 ? t("oneException") : t("exceptionsCount", ("count", kind.Outliers.Count.ToString())),
+            FileKindStatus.Missing => t("noAppSet"),
             _ => t("allSet")
         };
         AddMuted(text);
@@ -583,7 +608,7 @@ public partial class MainWindow : Window
 
     private static bool NeedsReview(FileKindSummary kind)
     {
-        return kind.Status != "Consistent";
+        return kind.Status != FileKindStatus.Consistent;
     }
 
     private string DisplayAppName(string? name)

@@ -119,10 +119,10 @@ public sealed class FileKindService
         var matchingFormats = primary?.Items.Count ?? 0;
         var missingFormats = items.Count(item => string.IsNullOrWhiteSpace(item.ProgId));
         var status = totalFormats == 0 || missingFormats == totalFormats
-            ? "Missing"
+            ? FileKindStatus.Missing
             : missingFormats > 0 || appGroups.Count > 1
-                ? "Mixed"
-                : "Consistent";
+                ? FileKindStatus.Mixed
+                : FileKindStatus.Consistent;
 
         var outliers = items
             .Where(item => primary is null || !string.Equals(DisplayAppName(item), primary.App, StringComparison.OrdinalIgnoreCase))
@@ -146,6 +146,7 @@ public sealed class FileKindService
             matchingFormats,
             totalFormats,
             status,
+            status.ToString(),
             outliers,
             items);
     }
@@ -159,8 +160,8 @@ public sealed class FileKindService
     {
         return summary.Status switch
         {
-            "Mixed" => 0,
-            "Missing" => 1,
+            FileKindStatus.Mixed => 0,
+            FileKindStatus.Missing => 1,
             _ => 2
         };
     }
