@@ -64,9 +64,9 @@ be classified are shown under `Other formats`.
 - Visual Studio 2022 with the .NET desktop development workload
 - .NET 8 SDK
 
-The app targets the Windows 10 1607 API surface so the portable package is not
-locked to newer Windows 10 builds such as 1809. Windows 7 and Windows 8.1 are
-not supported by the current .NET 8 desktop build.
+The app does not pin a specific Windows SDK target platform version. This keeps
+the project easier to build on machines with different Windows SDK versions.
+Windows 7 and Windows 8.1 are not supported by the current .NET 8 desktop build.
 
 ## Build, Run, and Test
 
