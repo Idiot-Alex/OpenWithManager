@@ -65,11 +65,53 @@ dotnet test
 `dotnet test` is the expected command once a test project is added. No test
 project exists yet.
 
+## Package
+
+The first supported release format is a portable zip. Run this from the
+repository root on Windows:
+
+```powershell
+.\scripts\package.ps1
+```
+
+The script defaults to:
+
+- `Release`
+- `win-x64`
+- self-contained publish
+- folder-based output, not single-file
+- trimming disabled
+
+Outputs are written under `artifacts/`:
+
+```text
+artifacts/
+  OpenWithManager-<version>-win-x64/
+  OpenWithManager-<version>-win-x64.zip
+  publish/
+```
+
+Other examples:
+
+```powershell
+.\scripts\package.ps1 -Runtime win-arm64
+.\scripts\package.ps1 -Version 0.1.1
+.\scripts\package.ps1 -SkipRestore
+```
+
+Before a public release, add a real `.ico` application icon and set
+`<ApplicationIcon>` in `src/OpenWithManager.App/OpenWithManager.App.csproj`.
+The current package script warns when no icon is configured, but it does not
+block local test packages.
+
 ## Project Structure
 
 ```text
 OpenWithManager.sln
+scripts/
+  package.ps1
 src/OpenWithManager.App/
+  app.manifest
   MainWindow.xaml
   MainWindow.xaml.cs
   Models/
@@ -82,6 +124,9 @@ src/OpenWithManager.App/
 ## Manual Verification Checklist
 
 - Build and run on Windows 10 or Windows 11.
+- Run `.\scripts\package.ps1` and launch `OpenWithManager.exe` from the
+  generated portable folder.
+- Confirm the packaged app starts without a UAC prompt.
 - Confirm the left file kind list shows one row per file kind, localized summary
   text, and deduplicated default-app icon badges.
 - Check a multi-format kind such as images and confirm each format row shows the
@@ -99,6 +144,7 @@ src/OpenWithManager.App/
 
 - Add focused tests for file kind grouping, app identity deduplication, summary
   text, and icon location parsing.
+- Add a real application icon before public distribution.
 - Improve diagnostics when Windows Settings or Shell association lookup cannot
   provide a reliable result.
 - Continue small refactors that keep `MainWindow` focused on layout and move
