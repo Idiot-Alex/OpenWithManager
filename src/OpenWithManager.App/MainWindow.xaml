@@ -264,7 +264,7 @@
                 Margin="0,0,0,4"
                 Padding="14,12"
                 Background="{StaticResource InkBrush}"
-                BorderBrush="#3a3d34"
+                BorderBrush="#343a42"
                 BorderThickness="1"
                 CornerRadius="7">
             <TextBlock x:Name="ToastText"

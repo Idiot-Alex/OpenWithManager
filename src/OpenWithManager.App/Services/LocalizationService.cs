@@ -163,11 +163,6 @@ public sealed class LocalizationService
         IsChinese = isChinese;
     }
 
-    public void ToggleLanguage()
-    {
-        IsChinese = !IsChinese;
-    }
-
     public string T(string key, params (string Key, string Value)[] values)
     {
         var dictionary = IsChinese ? Zh : En;

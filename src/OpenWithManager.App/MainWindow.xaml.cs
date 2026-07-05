@@ -23,6 +23,18 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<FileKindListItem> _visibleKinds = [];
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _refreshOnNextActivation;
+    private int _formatSelectionVersion;
+
+    private static readonly Color UiInkColor = Color.FromRgb(32, 36, 42);
+    private static readonly Color UiMutedColor = Color.FromRgb(99, 112, 128);
+    private static readonly Color UiLabelColor = Color.FromRgb(104, 116, 130);
+    private static readonly Color UiSurfaceColor = Color.FromRgb(255, 255, 255);
+    private static readonly Color UiSubtleColor = Color.FromRgb(238, 241, 244);
+    private static readonly Color UiLineColor = Color.FromRgb(216, 222, 230);
+    private static readonly Color UiHoverColor = Color.FromRgb(243, 246, 248);
+    private static readonly Color UiSelectedColor = Color.FromRgb(232, 238, 243);
+
+    private static SolidColorBrush UiBrush(Color color) => new(color);
 
     public MainWindow()
     {
@@ -41,8 +53,7 @@ public partial class MainWindow : Window
     {
         _state.IsLoading = true;
         _state.LoadError = null;
-        _state.SelectedFormat = null;
-        _state.SelectedCandidate = null;
+        ClearSelectedFormat();
         RenderLoading();
 
         try
@@ -81,8 +92,7 @@ public partial class MainWindow : Window
 
         if (nextSelected?.Kind.Id != selectedId)
         {
-            _state.SelectedFormat = null;
-            _state.SelectedCandidate = null;
+            ClearSelectedFormat();
         }
 
         _state.SelectedKind = nextSelected?.Kind;
@@ -241,6 +251,13 @@ public partial class MainWindow : Window
             && hasFilter;
     }
 
+    private void ClearSelectedFormat()
+    {
+        _formatSelectionVersion++;
+        _state.SelectedFormat = null;
+        _state.SelectedCandidate = null;
+    }
+
     private void RenderLoading()
     {
         _visibleKinds.Clear();
@@ -301,7 +318,7 @@ public partial class MainWindow : Window
             Text = t("fileKind"),
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Foreground = UiBrush(UiLabelColor),
             Margin = new Thickness(0, 0, 0, 6)
         });
         titleStack.Children.Add(new TextBlock
@@ -309,13 +326,13 @@ public partial class MainWindow : Window
             Text = kind.DisplayName,
             FontSize = 26,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             TextTrimming = TextTrimming.CharacterEllipsis
         });
         titleStack.Children.Add(new TextBlock
         {
             Text = FormatKindSummary(kind),
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             Margin = new Thickness(0, 5, 0, 0)
         });
         root.Children.Add(titleStack);
@@ -358,8 +375,8 @@ public partial class MainWindow : Window
             Width = 30,
             Height = 30,
             Margin = new Thickness(4, 0, 0, 0),
-            Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(216, 222, 230)),
+            Background = UiBrush(UiSurfaceColor),
+            BorderBrush = UiBrush(UiLineColor),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(7),
             ToolTip = badge.Label
@@ -372,7 +389,7 @@ public partial class MainWindow : Window
                 Text = badge.Initial,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(99, 112, 128)),
+                Foreground = UiBrush(UiMutedColor),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -412,13 +429,14 @@ public partial class MainWindow : Window
 
     private async Task SelectFormatAsync(string extension)
     {
+        var requestVersion = ++_formatSelectionVersion;
         var selectedKindId = _state.SelectedKind?.Id;
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
         try
         {
             var result = await Task.Run(() => _formatCandidates.GetCandidates(extension));
-            if (_state.SelectedKind?.Id != selectedKindId)
+            if (_state.SelectedKind?.Id != selectedKindId || requestVersion != _formatSelectionVersion)
             {
                 return;
             }
@@ -428,7 +446,17 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (requestVersion != _formatSelectionVersion)
+            {
+                return;
+            }
+
             ShowToast(ex.Message, true);
+        }
+
+        if (requestVersion != _formatSelectionVersion)
+        {
+            return;
         }
 
         RenderDetail();
@@ -456,8 +484,8 @@ public partial class MainWindow : Window
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var extensionBadge = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(255, 254, 250)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            Background = UiBrush(UiSurfaceColor),
+            BorderBrush = UiBrush(UiLineColor),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(7),
             Padding = new Thickness(10, 7, 10, 7),
@@ -465,7 +493,7 @@ public partial class MainWindow : Window
             Child = new TextBlock
             {
                 Text = FormatExtensionLabel(format.Extension),
-                Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+                Foreground = UiBrush(UiInkColor),
                 FontSize = 14,
                 FontWeight = FontWeights.SemiBold
             }
@@ -476,7 +504,7 @@ public partial class MainWindow : Window
         titleStack.Children.Add(new TextBlock
         {
             Text = item?.Description ?? format.Description,
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             FontSize = 16,
             FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
@@ -485,7 +513,7 @@ public partial class MainWindow : Window
         titleStack.Children.Add(new TextBlock
         {
             Text = t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))),
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 3, 0, 0)
         });
@@ -498,7 +526,7 @@ public partial class MainWindow : Window
             context.Children.Add(new TextBlock
             {
                 Text = t("selectedApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
-                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+                Foreground = UiBrush(UiMutedColor),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 6)
             });
@@ -555,7 +583,7 @@ public partial class MainWindow : Window
         FormatWorkPanel.Children.Add(new TextBlock
         {
             Text = t("pickFormat"),
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 8, 0, 0)
         });
@@ -574,7 +602,7 @@ public partial class MainWindow : Window
         {
             Text = DisplayAppName(candidate.AppName),
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
@@ -583,14 +611,14 @@ public partial class MainWindow : Window
         {
             Padding = new Thickness(8, 4, 8, 4),
             Visibility = _preferences.ShowCandidateSources || isCurrent ? Visibility.Visible : Visibility.Collapsed,
-            Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            Background = UiBrush(UiHoverColor),
+            BorderBrush = UiBrush(UiLineColor),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(10),
             Child = new TextBlock
             {
                 Text = CandidateSourceLabel(candidate.Source),
-                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+                Foreground = UiBrush(UiMutedColor),
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center
@@ -609,8 +637,8 @@ public partial class MainWindow : Window
             Padding = new Thickness(12, 10, 12, 10),
             MinHeight = 46,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            BorderBrush = new SolidColorBrush(isSelected ? Color.FromRgb(37, 39, 33) : Color.FromRgb(216, 213, 204)),
-            Background = new SolidColorBrush(isSelected ? Color.FromRgb(246, 244, 237) : Color.FromRgb(255, 254, 250)),
+            BorderBrush = UiBrush(isSelected ? UiInkColor : UiLineColor),
+            Background = UiBrush(isSelected ? UiSelectedColor : UiSurfaceColor),
             Content = content
         };
         button.Click += (_, _) =>
@@ -634,8 +662,8 @@ public partial class MainWindow : Window
             Width = holderSize,
             Height = holderSize,
             Margin = margin,
-            Background = new SolidColorBrush(Color.FromRgb(240, 238, 230)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
+            Background = UiBrush(UiSubtleColor),
+            BorderBrush = UiBrush(UiLineColor),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(holderSize >= 30 ? 7 : 6)
         };
@@ -675,7 +703,7 @@ public partial class MainWindow : Window
                 var cell = new Border
                 {
                     Margin = new Thickness(1.5),
-                    Background = new SolidColorBrush(Color.FromRgb(133, 130, 121)),
+                    Background = UiBrush(UiMutedColor),
                     CornerRadius = new CornerRadius(1.5)
                 };
                 Grid.SetRow(cell, row);
@@ -730,7 +758,7 @@ public partial class MainWindow : Window
             Header = t("technicalDetails"),
             IsExpanded = _preferences.ShowTechnicalDetails,
             Margin = new Thickness(0, 20, 0, 0),
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
+            Foreground = UiBrush(UiInkColor)
         };
 
         var stack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
@@ -784,7 +812,7 @@ public partial class MainWindow : Window
             Text = text,
             FontSize = isHeader ? 11 : 12,
             FontWeight = isHeader ? FontWeights.SemiBold : FontWeights.Normal,
-            Foreground = new SolidColorBrush(isHeader ? Color.FromRgb(122, 119, 111) : Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(isHeader ? UiLabelColor : UiMutedColor),
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 12, 0),
             VerticalAlignment = VerticalAlignment.Center
@@ -829,7 +857,7 @@ public partial class MainWindow : Window
         var label = new TextBlock
         {
             Text = text,
-            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Foreground = UiBrush(UiLabelColor),
             FontSize = 11,
             FontWeight = FontWeights.SemiBold,
             Margin = column == 2 ? new Thickness(32, 0, 0, 0) : new Thickness(0),
@@ -855,7 +883,7 @@ public partial class MainWindow : Window
         var code = new TextBlock
         {
             Text = FormatExtensionLabel(extension),
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
@@ -863,7 +891,7 @@ public partial class MainWindow : Window
         var descriptionText = new TextBlock
         {
             Text = description,
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
@@ -876,7 +904,7 @@ public partial class MainWindow : Window
         var appNameText = new TextBlock
         {
             Text = appName,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -896,8 +924,8 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             Padding = new Thickness(12, 9, 12, 9),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            BorderBrush = new SolidColorBrush(isSelected ? Color.FromRgb(37, 39, 33) : Color.FromRgb(216, 213, 204)),
-            Background = new SolidColorBrush(isSelected ? Color.FromRgb(246, 244, 237) : Color.FromRgb(255, 254, 250))
+            BorderBrush = UiBrush(isSelected ? UiInkColor : UiLineColor),
+            Background = UiBrush(isSelected ? UiSelectedColor : UiSurfaceColor)
         };
         button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
         return button;
@@ -910,7 +938,7 @@ public partial class MainWindow : Window
             Text = text,
             FontSize = 28,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            Foreground = UiBrush(UiInkColor),
             Margin = new Thickness(0, 0, 0, 10)
         });
     }
@@ -927,7 +955,7 @@ public partial class MainWindow : Window
             Text = text,
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Foreground = UiBrush(UiLabelColor),
             Margin = new Thickness(0, 8, 0, 0)
         });
     }
@@ -944,7 +972,7 @@ public partial class MainWindow : Window
             Text = text,
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            Foreground = UiBrush(UiLabelColor),
             Margin = new Thickness(0, 8, 0, 0)
         });
     }
@@ -954,7 +982,7 @@ public partial class MainWindow : Window
         DetailPanel.Children.Add(new TextBlock
         {
             Text = text,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
         });
@@ -970,7 +998,7 @@ public partial class MainWindow : Window
         panel.Children.Add(new TextBlock
         {
             Text = text,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextWrapping = TextWrapping.Wrap,
             Margin = margin
         });
@@ -981,7 +1009,7 @@ public partial class MainWindow : Window
         AddHeaderElement(new TextBlock
         {
             Text = text,
-            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            Foreground = UiBrush(UiMutedColor),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 2)
         });
@@ -991,8 +1019,8 @@ public partial class MainWindow : Window
     {
         _toastTimer.Stop();
         ToastText.Text = message;
-        ToastBorder.Background = new SolidColorBrush(isError ? Color.FromRgb(119, 44, 44) : Color.FromRgb(35, 37, 31));
-        ToastBorder.BorderBrush = new SolidColorBrush(isError ? Color.FromRgb(147, 67, 67) : Color.FromRgb(58, 61, 52));
+        ToastBorder.Background = UiBrush(isError ? Color.FromRgb(119, 44, 44) : UiInkColor);
+        ToastBorder.BorderBrush = UiBrush(isError ? Color.FromRgb(147, 67, 67) : Color.FromRgb(52, 58, 66));
         ToastBorder.Visibility = Visibility.Visible;
         _toastTimer.Start();
     }
@@ -1101,8 +1129,7 @@ public partial class MainWindow : Window
         }
 
         _state.SelectedKind = item.Kind;
-        _state.SelectedFormat = null;
-        _state.SelectedCandidate = null;
+        ClearSelectedFormat();
         RenderDetail();
         _ = SelectFirstFormatIfNeededAsync();
     }
@@ -1190,8 +1217,7 @@ public partial class MainWindow : Window
 
         _preferences.UseDeveloperFormatView = enabled;
         SavePreferences();
-        _state.SelectedFormat = null;
-        _state.SelectedCandidate = null;
+        ClearSelectedFormat();
         await LoadFileKindsAsync();
         SyncPreferencesPanel();
     }
