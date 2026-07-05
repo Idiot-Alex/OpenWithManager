@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using OpenWithManager.App.Models;
 using OpenWithManager.App.Services;
 using OpenWithManager.App.ViewModels;
@@ -19,6 +20,7 @@ public partial class MainWindow : Window
     private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
     private readonly ObservableCollection<FileKindListItem> _visibleKinds = [];
+    private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _refreshOnNextActivation;
 
     public MainWindow()
@@ -30,6 +32,7 @@ public partial class MainWindow : Window
         KindList.ItemsSource = _visibleKinds;
         Loaded += async (_, _) => await LoadFileKindsAsync();
         Activated += async (_, _) => await RefreshAfterExternalSettingsAsync();
+        _toastTimer.Tick += (_, _) => HideToast();
     }
 
     private async Task LoadFileKindsAsync()
@@ -206,13 +209,13 @@ public partial class MainWindow : Window
 
         var badges = appGroups
             .Take(3)
-            .Select(group => new AppIconBadge(group.AppName, CandidateInitial(group.AppName), _icons.GetIcon(group.Icon)))
+            .Select(group => new AppIconBadge(group.AppName, "", _icons.GetIcon(group.Icon)))
             .ToList();
 
         var remaining = appGroups.Count - badges.Count;
         if (remaining > 0)
         {
-            badges.Add(new AppIconBadge(t("moreApps", ("count", remaining.ToString())), $"+{remaining}", null));
+            badges.Add(new AppIconBadge(t("moreApps", ("count", remaining.ToString())), $"+{remaining}", null, true));
         }
 
         return badges;
@@ -291,7 +294,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, t("loadFailedTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowToast(ex.Message, true);
         }
 
         RenderDetail();
@@ -427,15 +430,7 @@ public partial class MainWindow : Window
         };
 
         holder.Child = icon is null
-            ? new TextBlock
-            {
-                Text = CandidateInitial(appName),
-                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
-                FontSize = holderSize >= 30 ? 12 : 10,
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            ? MakeGenericAppGlyph(holderSize >= 30 ? 14 : 12)
             : new Image
             {
                 Source = icon,
@@ -448,6 +443,39 @@ public partial class MainWindow : Window
         return holder;
     }
 
+    private static FrameworkElement MakeGenericAppGlyph(double size)
+    {
+        var grid = new Grid
+        {
+            Width = size,
+            Height = size,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+
+        for (var row = 0; row < 2; row++)
+        {
+            for (var column = 0; column < 2; column++)
+            {
+                var cell = new Border
+                {
+                    Margin = new Thickness(1.5),
+                    Background = new SolidColorBrush(Color.FromRgb(133, 130, 121)),
+                    CornerRadius = new CornerRadius(1.5)
+                };
+                Grid.SetRow(cell, row);
+                Grid.SetColumn(cell, column);
+                grid.Children.Add(cell);
+            }
+        }
+
+        return grid;
+    }
+
     private async Task OpenDefaultSettingsAsync()
     {
         await Task.Run(() => _settings.OpenDefaultApps());
@@ -458,14 +486,14 @@ public partial class MainWindow : Window
     {
         await Task.Run(() => _settings.OpenDefaultApps(candidate?.SettingsParameterName, candidate?.SettingsParameterValue));
         _refreshOnNextActivation = true;
-        MessageBox.Show(this, FormatSettingsHint(extension, candidate), t("openSettings"), MessageBoxButton.OK, MessageBoxImage.Information);
+        ShowToast(FormatSettingsHint(extension, candidate));
     }
 
     private void CopyFormatToClipboard(string extension)
     {
         var label = FormatExtensionLabel(extension);
         Clipboard.SetText(label);
-        MessageBox.Show(this, t("formatCopied", ("extension", label)), t("copyFormat"), MessageBoxButton.OK, MessageBoxImage.Information);
+        ShowToast(t("formatCopied", ("extension", label)));
     }
 
     private async Task RefreshAfterExternalSettingsAsync()
@@ -639,6 +667,22 @@ public partial class MainWindow : Window
         });
     }
 
+    private void ShowToast(string message, bool isError = false)
+    {
+        _toastTimer.Stop();
+        ToastText.Text = message;
+        ToastBorder.Background = new SolidColorBrush(isError ? Color.FromRgb(119, 44, 44) : Color.FromRgb(35, 37, 31));
+        ToastBorder.BorderBrush = new SolidColorBrush(isError ? Color.FromRgb(147, 67, 67) : Color.FromRgb(58, 61, 52));
+        ToastBorder.Visibility = Visibility.Visible;
+        _toastTimer.Start();
+    }
+
+    private void HideToast()
+    {
+        _toastTimer.Stop();
+        ToastBorder.Visibility = Visibility.Collapsed;
+    }
+
     private Button MakeButton(string text, RoutedEventHandler click, bool primary = false)
     {
         var button = new Button
@@ -708,11 +752,6 @@ public partial class MainWindow : Window
     private static string FormatExtensionLabel(string extension)
     {
         return $".{FormatCode(extension)}";
-    }
-
-    private static string CandidateInitial(string appName)
-    {
-        return string.IsNullOrWhiteSpace(appName) ? "?" : appName.Trim()[0].ToString().ToUpperInvariant();
     }
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e)

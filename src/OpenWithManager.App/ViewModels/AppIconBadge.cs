@@ -5,4 +5,5 @@ namespace OpenWithManager.App.ViewModels;
 public sealed record AppIconBadge(
     string Label,
     string Initial,
-    ImageSource? Icon);
+    ImageSource? Icon,
+    bool IsOverflow = false);
