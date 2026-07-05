@@ -128,26 +128,65 @@
                             <DataTemplate>
                                 <Grid MinHeight="58" Margin="10,8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="44" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Width="36" Height="36" Background="{StaticResource SubtleBrush}" CornerRadius="7">
-                                        <TextBlock Text="{Binding ShortName}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource InkBrush}"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="{Binding DisplayName}"
                                                    Foreground="{StaticResource InkBrush}"
-                                                   FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding PrimaryAppName}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding SummaryText}"
                                                    Margin="0,4,0,0"
                                                    Foreground="{StaticResource MutedBrush}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
+                                    <ItemsControl Grid.Column="1"
+                                                  ItemsSource="{Binding Badges}"
+                                                  Margin="12,0,0,0"
+                                                  VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Width="26"
+                                                        Height="26"
+                                                        Margin="-4,0,0,0"
+                                                        Background="{StaticResource SurfaceBrush}"
+                                                        BorderBrush="{StaticResource LineBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6"
+                                                        ToolTip="{Binding Label}">
+                                                    <Grid>
+                                                        <Image x:Name="BadgeIcon"
+                                                               Source="{Binding Icon}"
+                                                               Width="18"
+                                                               Height="18"
+                                                               Stretch="Uniform"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="BadgeInitial"
+                                                                   Text="{Binding Initial}"
+                                                                   Visibility="Collapsed"
+                                                                   FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource MutedBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+                                                        <Setter TargetName="BadgeIcon" Property="Visibility" Value="Collapsed" />
+                                                        <Setter TargetName="BadgeInitial" Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

@@ -18,7 +18,7 @@ public partial class MainWindow : Window
     private readonly LocalizationService _text = new();
     private readonly AppIconService _icons = new();
     private readonly MainWindowState _state = new();
-    private readonly ObservableCollection<FileKindSummary> _visibleKinds = [];
+    private readonly ObservableCollection<FileKindListItem> _visibleKinds = [];
     private bool _refreshOnNextActivation;
 
     public MainWindow()
@@ -65,20 +65,20 @@ public partial class MainWindow : Window
     {
         var visible = _state.AllKinds
             .Where(MatchesFilter)
-            .Select(LocalizeKind)
+            .Select(MakeListItem)
             .ToList();
         var selectedId = _state.SelectedKind?.Id;
         var nextSelected = visible.Count == 0
             ? null
-            : visible.FirstOrDefault(kind => kind.Id == selectedId) ?? visible.First();
+            : visible.FirstOrDefault(item => item.Kind.Id == selectedId) ?? visible.First();
 
-        if (nextSelected?.Id != selectedId)
+        if (nextSelected?.Kind.Id != selectedId)
         {
             _state.SelectedFormat = null;
             _state.SelectedCandidate = null;
         }
 
-        _state.SelectedKind = nextSelected;
+        _state.SelectedKind = nextSelected?.Kind;
 
         _visibleKinds.Clear();
         foreach (var kind in visible)
@@ -86,7 +86,7 @@ public partial class MainWindow : Window
             _visibleKinds.Add(kind);
         }
 
-        KindList.SelectedItem = _state.SelectedKind;
+        KindList.SelectedItem = nextSelected;
         EmptyText.Visibility = ShouldShowEmptyText(visible) ? Visibility.Visible : Visibility.Collapsed;
         EmptyText.Text = t("emptyNoMatch");
         UpdateStaticText();
@@ -128,12 +128,77 @@ public partial class MainWindow : Window
         return text.Contains(_state.Query, StringComparison.OrdinalIgnoreCase);
     }
 
-    private FileKindSummary LocalizeKind(FileKindSummary kind)
+    private FileKindListItem MakeListItem(FileKindSummary kind)
     {
-        return kind with { PrimaryAppName = DisplayAppName(kind.PrimaryAppName) };
+        return new FileKindListItem(
+            kind,
+            kind.DisplayName,
+            FormatKindSummary(kind),
+            BuildAppBadges(kind));
     }
 
-    private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindSummary> visible)
+    private string FormatKindSummary(FileKindSummary kind)
+    {
+        var formatCount = kind.Items.Count;
+        var formatText = t(formatCount == 1 ? "oneFormat" : "formatCount", ("count", formatCount.ToString()));
+        var hasMissing = kind.Items.Any(item => string.IsNullOrWhiteSpace(item.ProgId));
+        if (hasMissing)
+        {
+            return $"{formatText} · {t("hasUnsetFormats")}";
+        }
+
+        var appCount = CountDistinctApps(kind);
+        var appText = appCount <= 1
+            ? DisplayAppName(kind.PrimaryAppName)
+            : t("appCount", ("count", appCount.ToString()));
+
+        return $"{formatText} · {appText}";
+    }
+
+    private static int CountDistinctApps(FileKindSummary kind)
+    {
+        return kind.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item.ProgId))
+            .Select(item => DisplayAppKey(item.FriendlyName ?? item.ProgId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+    }
+
+    private IReadOnlyCollection<AppIconBadge> BuildAppBadges(FileKindSummary kind)
+    {
+        var appGroups = kind.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item.ProgId))
+            .GroupBy(item => DisplayAppKey(item.FriendlyName ?? item.ProgId), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                AppName = DisplayAppName(group.First().FriendlyName ?? group.First().ProgId),
+                Count = group.Count(),
+                Icon = group.Select(item => item.Icon).FirstOrDefault(icon => icon is not null)
+            })
+            .OrderByDescending(group => group.Count)
+            .ThenBy(group => group.AppName)
+            .ToList();
+
+        var badges = appGroups
+            .Take(3)
+            .Select(group => new AppIconBadge(group.AppName, CandidateInitial(group.AppName), _icons.GetIcon(group.Icon)))
+            .ToList();
+
+        var remaining = appGroups.Count - badges.Count;
+        if (remaining > 0)
+        {
+            badges.Add(new AppIconBadge(t("moreApps", ("count", remaining.ToString())), $"+{remaining}", null));
+        }
+
+        return badges;
+    }
+
+    private static string DisplayAppKey(string? name)
+    {
+        return string.IsNullOrWhiteSpace(name) ? "" : name.Trim();
+    }
+
+    private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindListItem> visible)
     {
         var hasFilter = !string.IsNullOrWhiteSpace(_state.Query) || _state.Status != "All";
         return !_state.IsLoading
@@ -651,12 +716,12 @@ public partial class MainWindow : Window
 
     private void OnKindSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (KindList.SelectedItem is not FileKindSummary kind || _state.SelectedKind?.Id == kind.Id)
+        if (KindList.SelectedItem is not FileKindListItem item || _state.SelectedKind?.Id == item.Kind.Id)
         {
             return;
         }
 
-        _state.SelectedKind = kind;
+        _state.SelectedKind = item.Kind;
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
         RenderDetail();
