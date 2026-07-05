@@ -240,19 +240,21 @@ public partial class MainWindow : Window
     {
         _visibleKinds.Clear();
         EmptyText.Visibility = Visibility.Collapsed;
+        DetailHeaderPanel.Children.Clear();
         DetailPanel.Children.Clear();
         AddTitle(t("readingDefaultsTitle"));
-        AddMuted(t("readingDefaultsBody"));
+        AddHeaderMuted(t("readingDefaultsBody"));
     }
 
     private void RenderDetail()
     {
+        DetailHeaderPanel.Children.Clear();
         DetailPanel.Children.Clear();
 
         if (_state.LoadError is not null)
         {
             AddTitle(t("loadFailedTitle"));
-            AddMuted(_state.LoadError);
+            AddHeaderMuted(_state.LoadError);
             return;
         }
 
@@ -265,7 +267,7 @@ public partial class MainWindow : Window
         if (_state.SelectedKind is null)
         {
             AddTitle(t("noFileKindSelected"));
-            AddMuted(t("pickFileKind"));
+            AddHeaderMuted(t("pickFileKind"));
             return;
         }
 
@@ -275,7 +277,7 @@ public partial class MainWindow : Window
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 18, 0, 22) };
         actions.Children.Add(MakeButton(t("openDefaultApps"), async (_, _) => await OpenDefaultSettingsAsync(), true));
-        DetailPanel.Children.Add(actions);
+        AddHeaderElement(actions);
 
         AddSectionLabel(t("formats"));
         AddFormatRows(_state.SelectedKind);
@@ -285,6 +287,7 @@ public partial class MainWindow : Window
 
     private async Task SelectFormatAsync(string extension)
     {
+        DetailHeaderPanel.Children.Clear();
         DetailPanel.Children.Clear();
         AddTitle(t("loadingApps"));
         try
@@ -336,7 +339,7 @@ public partial class MainWindow : Window
             _state.SelectedCandidate = null;
             RenderDetail();
         });
-        DetailPanel.Children.Add(back);
+        AddHeaderElement(back);
 
         AddEyebrow(FormatExtensionLabel(format.Extension));
         AddTitle(item?.Description ?? format.Description);
@@ -348,9 +351,9 @@ public partial class MainWindow : Window
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 8) };
         actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
         actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
-        DetailPanel.Children.Add(actions);
+        AddHeaderElement(actions);
 
-        AddMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
+        AddHeaderMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
     }
 
     private Button MakeCandidateButton(FormatAppCandidate candidate)
@@ -611,7 +614,7 @@ public partial class MainWindow : Window
 
     private void AddTitle(string text)
     {
-        DetailPanel.Children.Add(new TextBlock
+        AddHeaderElement(new TextBlock
         {
             Text = text,
             FontSize = 28,
@@ -623,7 +626,7 @@ public partial class MainWindow : Window
 
     private void AddSummary(string text)
     {
-        DetailPanel.Children.Add(new TextBlock
+        AddHeaderElement(new TextBlock
         {
             Text = text,
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
@@ -634,7 +637,7 @@ public partial class MainWindow : Window
 
     private void AddEyebrow(string text)
     {
-        DetailPanel.Children.Add(new TextBlock
+        AddHeaderElement(new TextBlock
         {
             Text = text.ToUpperInvariant(),
             FontSize = 12,
@@ -642,6 +645,11 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
             Margin = new Thickness(0, 0, 0, 8)
         });
+    }
+
+    private void AddHeaderElement(UIElement element)
+    {
+        DetailHeaderPanel.Children.Add(element);
     }
 
     private void AddSectionLabel(string text)
@@ -664,6 +672,17 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
+        });
+    }
+
+    private void AddHeaderMuted(string text)
+    {
+        AddHeaderElement(new TextBlock
+        {
+            Text = text,
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 2)
         });
     }
 

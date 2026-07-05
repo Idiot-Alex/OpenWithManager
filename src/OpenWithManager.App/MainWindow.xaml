@@ -218,9 +218,23 @@
             </Border>
 
             <Border Grid.Column="2" Style="{StaticResource Panel}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="DetailPanel" Margin="24" />
-                </ScrollViewer>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel x:Name="DetailHeaderPanel"
+                                Margin="24,24,24,14" />
+
+                    <Border Grid.Row="1"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="0,1,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="DetailPanel" Margin="24,18,24,24" />
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
 

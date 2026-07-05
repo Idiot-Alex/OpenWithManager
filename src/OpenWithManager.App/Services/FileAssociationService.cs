@@ -28,6 +28,7 @@ public sealed class FileAssociationService
         new(".mp4", "Video", "MP4 video"),
         new(".mov", "Video", "QuickTime video"),
         new(".mkv", "Video", "Matroska video"),
+        new(".ts", "Video", "MPEG transport stream video"),
         new(".zip", "Archive", "ZIP archive"),
         new(".rar", "Archive", "RAR archive"),
         new(".7z", "Archive", "7-Zip archive"),
@@ -35,7 +36,6 @@ public sealed class FileAssociationService
         new(".htm", "Web", "HTML document"),
         new(".json", "Code", "JSON file"),
         new(".js", "Code", "JavaScript file"),
-        new(".ts", "Code", "TypeScript file"),
         new(".cs", "Code", "C# source file"),
         new(".py", "Code", "Python source file")
     ];

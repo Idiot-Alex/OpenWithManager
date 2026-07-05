@@ -19,7 +19,7 @@ public sealed class FileKindService
             "Videos",
             "Videos",
             "Movies, clips, and screen recordings.",
-            [".mp4", ".mov", ".mkv"]),
+            [".mp4", ".mov", ".mkv", ".ts"]),
         new(
             "music",
             "Music and audio",
@@ -67,7 +67,7 @@ public sealed class FileKindService
             "Code files",
             "Code",
             "Developer files that usually open in an editor.",
-            [".json", ".js", ".ts", ".cs", ".py"]),
+            [".json", ".js", ".cs", ".py"]),
         new(
             "web",
             "Web pages",
