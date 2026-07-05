@@ -460,6 +460,7 @@ public partial class MainWindow : Window
         }
 
         RenderDetail();
+        FormatWorkScrollViewer.ScrollToTop();
     }
 
     private void AddSelectedFormatPanel(FormatCandidateResult format)
@@ -467,18 +468,7 @@ public partial class MainWindow : Window
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        var shell = new Grid();
-        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
-        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-        shell.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        var context = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 22, 0)
-        };
-        AddWorkSectionLabel(context, t("formatActions"));
+        AddWorkSectionLabel(t("formatActions"));
         var header = new Grid { Margin = new Thickness(0, 8, 0, 8) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -519,62 +509,47 @@ public partial class MainWindow : Window
         });
         Grid.SetColumn(titleStack, 1);
         header.Children.Add(titleStack);
-        context.Children.Add(header);
+        FormatWorkPanel.Children.Add(header);
 
         if (_state.SelectedCandidate is not null)
         {
-            context.Children.Add(new TextBlock
+            FormatWorkPanel.Children.Add(new TextBlock
             {
                 Text = t("selectedApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
                 Foreground = UiBrush(UiMutedColor),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 6)
+                Margin = new Thickness(0, 0, 0, 10)
             });
         }
-        AddWorkMuted(context, t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))), new Thickness(0));
-        shell.Children.Add(context);
 
-        var candidates = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 16, 0)
-        };
-        AddWorkSectionLabel(candidates, t("availableApps"));
+        var primaryAction = MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true);
+        primaryAction.HorizontalAlignment = HorizontalAlignment.Stretch;
+        primaryAction.HorizontalContentAlignment = HorizontalAlignment.Center;
+        primaryAction.Margin = new Thickness(0, 0, 0, 8);
+        FormatWorkPanel.Children.Add(primaryAction);
+
+        var copyAction = MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension));
+        copyAction.HorizontalAlignment = HorizontalAlignment.Stretch;
+        copyAction.HorizontalContentAlignment = HorizontalAlignment.Center;
+        copyAction.Margin = new Thickness(0, 0, 0, 10);
+        FormatWorkPanel.Children.Add(copyAction);
+
+        AddWorkMuted(t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))));
+        AddWorkSectionLabel(t("availableApps"));
         if (format.Candidates.Count == 0)
         {
-            AddWorkMuted(candidates, t("noCandidateApps"), new Thickness(0, 8, 0, 0));
+            AddWorkMuted(t("noCandidateApps"));
         }
         else
         {
-            var wrap = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var list = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             foreach (var candidate in format.Candidates)
             {
-                wrap.Children.Add(MakeCandidateButton(candidate));
+                list.Children.Add(MakeCandidateButton(candidate));
             }
 
-            candidates.Children.Add(wrap);
+            FormatWorkPanel.Children.Add(list);
         }
-
-        Grid.SetColumn(candidates, 1);
-        shell.Children.Add(candidates);
-
-        var actions = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var primaryAction = MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true);
-        primaryAction.MinWidth = 160;
-        primaryAction.Margin = new Thickness(0, 0, 0, 8);
-        var copyAction = MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension));
-        copyAction.MinWidth = 160;
-        copyAction.Margin = new Thickness(0);
-        actions.Children.Add(primaryAction);
-        actions.Children.Add(copyAction);
-        Grid.SetColumn(actions, 3);
-        shell.Children.Add(actions);
-        FormatWorkPanel.Children.Add(shell);
     }
 
     private void AddNoFormatSelectedPanel()
@@ -632,10 +607,10 @@ public partial class MainWindow : Window
         var button = new Button
         {
             Style = (Style)FindResource("BaseButton"),
-            Width = 166,
-            Margin = new Thickness(0, 0, 8, 8),
+            Margin = new Thickness(0, 0, 0, 8),
             Padding = new Thickness(12, 10, 12, 10),
             MinHeight = 46,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             BorderBrush = UiBrush(isSelected ? UiInkColor : UiLineColor),
             Background = UiBrush(isSelected ? UiSelectedColor : UiSurfaceColor),
@@ -871,8 +846,8 @@ public partial class MainWindow : Window
     {
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 132 });
         return content;
     }
 
