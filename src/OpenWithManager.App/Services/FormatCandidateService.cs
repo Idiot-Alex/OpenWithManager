@@ -49,11 +49,15 @@ public sealed class FormatCandidateService
                 var settingsTarget = group.FirstOrDefault(candidate =>
                     !string.IsNullOrWhiteSpace(candidate.SettingsParameterName)
                     && !string.IsNullOrWhiteSpace(candidate.SettingsParameterValue));
-                var iconTarget = group.FirstOrDefault(candidate => candidate.Icon is not null);
+                var iconTarget = group
+                    .Where(candidate => candidate.Icon is not null)
+                    .OrderBy(IconSourcePriority)
+                    .ThenBy(SourcePriority)
+                    .FirstOrDefault();
 
                 return selected with
                 {
-                    Icon = selected.Icon ?? iconTarget?.Icon,
+                    Icon = iconTarget?.Icon ?? selected.Icon,
                     SettingsParameterName = settingsTarget?.SettingsParameterName ?? selected.SettingsParameterName,
                     SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue
                 };
@@ -168,7 +172,7 @@ public sealed class FormatCandidateService
             yield return new FormatAppCandidate(
                 appName,
                 progId,
-                FileAssociationService.ReadRegisteredApplicationIconLocation(hive, capabilitiesPath, progId),
+                FileAssociationService.ReadRegisteredApplicationIconLocation(hive, capabilitiesPath, valueName, progId),
                 "RegisteredApplication",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase),
                 settingsParameterName,
@@ -184,9 +188,27 @@ public sealed class FormatCandidateService
 
     private static string CandidateKey(FormatAppCandidate candidate)
     {
-        return !string.IsNullOrWhiteSpace(candidate.ProgId)
-            ? $"prog:{candidate.ProgId}"
-            : $"app:{candidate.AppName}";
+        var appIdentity = AppIdentityService.NormalizeAppName(candidate.AppName);
+        if (!string.IsNullOrWhiteSpace(appIdentity))
+        {
+            return $"app:{appIdentity}";
+        }
+
+        return !string.IsNullOrWhiteSpace(candidate.ProgId) ? $"prog:{candidate.ProgId}" : "";
+    }
+
+    private static int IconSourcePriority(FormatAppCandidate candidate)
+    {
+        return candidate.Source switch
+        {
+            "ShellRecommended" => 0,
+            "ShellHandler" => 1,
+            "RegisteredApplication" => 2,
+            "Current" => 3,
+            "OpenWithList" => 4,
+            "OpenWithProgids" => 5,
+            _ => 6
+        };
     }
 
     private static int SourcePriority(FormatAppCandidate candidate)

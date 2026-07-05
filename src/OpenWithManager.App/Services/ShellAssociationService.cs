@@ -30,7 +30,8 @@ public sealed class ShellAssociationService
             {
                 try
                 {
-                    var appName = ReadComString(handler.GetUIName) ?? ReadComString(handler.GetName);
+                    var handlerName = ReadComString(handler.GetName);
+                    var appName = ReadComString(handler.GetUIName) ?? handlerName;
                     if (string.IsNullOrWhiteSpace(appName))
                     {
                         continue;
@@ -39,7 +40,7 @@ public sealed class ShellAssociationService
                     yield return new FormatAppCandidate(
                         appName,
                         null,
-                        ReadIconLocation(handler),
+                        FileAssociationService.ReadShellApplicationIconLocation(handlerName) ?? ReadIconLocation(handler),
                         source,
                         false);
                 }

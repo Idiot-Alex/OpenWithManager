@@ -238,7 +238,7 @@ public partial class MainWindow : Window
 
     private static string DisplayAppKey(string? name)
     {
-        return string.IsNullOrWhiteSpace(name) ? "" : name.Trim();
+        return AppIdentityService.NormalizeAppName(name);
     }
 
     private bool ShouldShowEmptyText(IReadOnlyCollection<FileKindListItem> visible)
