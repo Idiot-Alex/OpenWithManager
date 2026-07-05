@@ -142,6 +142,7 @@ public sealed class FileKindService
             profile.Extensions,
             primaryItem is null ? null : DisplayAppName(primaryItem),
             primaryItem?.ProgId,
+            primaryItem?.Icon,
             matchingFormats,
             totalFormats,
             status,

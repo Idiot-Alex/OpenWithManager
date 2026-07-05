@@ -22,7 +22,7 @@ public sealed class FormatCandidateService
             .FirstOrDefault(item => string.Equals(item.Extension, normalizedExtension, StringComparison.OrdinalIgnoreCase));
 
         var candidates = new List<FormatAppCandidate>();
-        if (currentItem is not null && !string.IsNullOrWhiteSpace(currentItem.FriendlyName ?? currentItem.ProgId))
+        if (!string.IsNullOrWhiteSpace(currentItem?.ProgId))
         {
             candidates.Add(new FormatAppCandidate(
                 currentItem.FriendlyName ?? currentItem.ProgId!,

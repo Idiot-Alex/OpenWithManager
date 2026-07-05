@@ -16,7 +16,7 @@ public sealed class ExportImportService
         var snapshot = new AssociationSnapshot(
             DateTimeOffset.Now,
             Environment.MachineName,
-            associations.ToList());
+            associations.Select(item => item with { Icon = null }).ToList());
 
         File.WriteAllText(path, JsonSerializer.Serialize(snapshot, _jsonOptions));
     }

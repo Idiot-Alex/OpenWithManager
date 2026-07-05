@@ -47,8 +47,10 @@ public sealed class FileAssociationService
                 var shellProgId = ReadAssociationString(extension.Extension, AssocString.ProgId);
                 var fallback = ReadClassDefault(extension.Extension);
                 var progId = userChoice ?? shellProgId ?? fallback;
-                var appName = ReadAssociationString(extension.Extension, AssocString.FriendlyAppName)
-                    ?? ReadFriendlyName(progId);
+                var appName = progId is null
+                    ? null
+                    : ReadAssociationString(extension.Extension, AssocString.FriendlyAppName)
+                        ?? ReadFriendlyName(progId);
 
                 return new FileAssociationItem(
                     extension.Extension,
@@ -56,6 +58,7 @@ public sealed class FileAssociationService
                     extension.Description,
                     progId,
                     appName,
+                    progId is null ? null : ReadIconLocation(progId),
                     userChoice is not null ? "UserChoice" : shellProgId is not null ? "Shell" : fallback is not null ? "Registry" : "Unknown");
             })
             .OrderBy(item => item.Category)
