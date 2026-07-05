@@ -258,12 +258,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_state.SelectedFormat is not null)
-        {
-            RenderFormatDetail(_state.SelectedFormat);
-            return;
-        }
-
         if (_state.SelectedKind is null)
         {
             AddTitle(t("noFileKindSelected"));
@@ -282,14 +276,19 @@ public partial class MainWindow : Window
         AddSectionLabel(t("formats"));
         AddFormatRows(_state.SelectedKind);
 
+        if (_state.SelectedFormat is not null)
+        {
+            AddSelectedFormatPanel(_state.SelectedFormat);
+            AddCandidateApps(_state.SelectedFormat);
+        }
+
         AddTechnicalItems(_state.SelectedKind.Items);
     }
 
     private async Task SelectFormatAsync(string extension)
     {
-        DetailHeaderPanel.Children.Clear();
-        DetailPanel.Children.Clear();
-        AddTitle(t("loadingApps"));
+        _state.SelectedFormat = null;
+        _state.SelectedCandidate = null;
         try
         {
             _state.SelectedFormat = await Task.Run(() => _formatCandidates.GetCandidates(extension));
@@ -303,57 +302,68 @@ public partial class MainWindow : Window
         RenderDetail();
     }
 
-    private void RenderFormatDetail(FormatCandidateResult format)
+    private void AddSelectedFormatPanel(FormatCandidateResult format)
     {
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        AddFormatHeader(format, item);
-        AddFormatActions(format);
+        AddSectionLabel(t("selectedFormat"));
+        DetailPanel.Children.Add(new TextBlock
+        {
+            Text = FormatExtensionLabel(format.Extension),
+            Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33)),
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 2)
+        });
+        DetailPanel.Children.Add(new TextBlock
+        {
+            Text = item?.Description ?? format.Description,
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 4)
+        });
+        DetailPanel.Children.Add(new TextBlock
+        {
+            Text = t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))),
+            Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, _state.SelectedCandidate is null ? 12 : 4)
+        });
+        if (_state.SelectedCandidate is not null)
+        {
+            DetailPanel.Children.Add(new TextBlock
+            {
+                Text = t("targetApp", ("app", DisplayAppName(_state.SelectedCandidate.AppName))),
+                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 12)
+            });
+        }
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+        actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
+        actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
+        DetailPanel.Children.Add(actions);
+
+        AddMuted(t("settingsSearchHint", ("extension", FormatExtensionLabel(format.Extension))));
+    }
+
+    private void AddCandidateApps(FormatCandidateResult format)
+    {
         AddSectionLabel(t("availableApps"));
 
         if (format.Candidates.Count == 0)
         {
             AddMuted(t("noCandidateApps"));
-        }
-        else
-        {
-            foreach (var candidate in format.Candidates)
-            {
-                var row = MakeCandidateButton(candidate);
-                DetailPanel.Children.Add(row);
-            }
+            return;
         }
 
-        if (item is not null)
+        foreach (var candidate in format.Candidates)
         {
-            AddTechnicalItems([item]);
+            var row = MakeCandidateButton(candidate);
+            DetailPanel.Children.Add(row);
         }
-    }
-
-    private void AddFormatHeader(FormatCandidateResult format, FileAssociationItem? item)
-    {
-        var back = MakeButton(t("backToFileKind"), (_, _) =>
-        {
-            _state.SelectedFormat = null;
-            _state.SelectedCandidate = null;
-            RenderDetail();
-        });
-        AddHeaderElement(back);
-
-        AddEyebrow(FormatExtensionLabel(format.Extension));
-        AddTitle(item?.Description ?? format.Description);
-        AddSummary(t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))));
-    }
-
-    private void AddFormatActions(FormatCandidateResult format)
-    {
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 8) };
-        actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
-        actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
-        AddHeaderElement(actions);
-
-        AddHeaderMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
     }
 
     private Button MakeCandidateButton(FormatAppCandidate candidate)
@@ -523,44 +533,125 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 20, 0, 0),
             Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
         };
-        var stack = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+
+        var stack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        stack.Children.Add(MakeTechnicalHeader());
+
         foreach (var item in items)
         {
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"{item.Extension}  {DisplayAppName(item.FriendlyName ?? item.ProgId)}  {item.ProgId ?? t("none")}",
-                Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
-                Margin = new Thickness(0, 0, 0, 6)
-            });
+            stack.Children.Add(MakeTechnicalRow(item));
         }
+
         expander.Content = stack;
         DetailPanel.Children.Add(expander);
+    }
+
+    private Grid MakeTechnicalHeader()
+    {
+        var grid = MakeTechnicalGrid();
+        grid.Margin = new Thickness(0, 0, 0, 6);
+        AddTechnicalCell(grid, t("technicalFormat"), 0, true);
+        AddTechnicalCell(grid, t("technicalCurrentApp"), 1, true);
+        AddTechnicalCell(grid, t("technicalProgId"), 2, true);
+        AddTechnicalCell(grid, t("technicalSource"), 3, true);
+        return grid;
+    }
+
+    private Grid MakeTechnicalRow(FileAssociationItem item)
+    {
+        var grid = MakeTechnicalGrid();
+        grid.Margin = new Thickness(0, 0, 0, 6);
+        AddTechnicalCell(grid, FormatExtensionLabel(item.Extension), 0, false);
+        AddTechnicalCell(grid, DisplayAppName(item.FriendlyName ?? item.ProgId), 1, false);
+        AddTechnicalCell(grid, item.ProgId ?? t("none"), 2, false);
+        AddTechnicalCell(grid, TechnicalSourceLabel(item.Source), 3, false);
+        return grid;
+    }
+
+    private static Grid MakeTechnicalGrid()
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(72) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
+        return grid;
+    }
+
+    private static void AddTechnicalCell(Grid grid, string text, int column, bool isHeader)
+    {
+        var cell = new TextBlock
+        {
+            Text = text,
+            FontSize = isHeader ? 11 : 12,
+            FontWeight = isHeader ? FontWeights.SemiBold : FontWeights.Normal,
+            Foreground = new SolidColorBrush(isHeader ? Color.FromRgb(122, 119, 111) : Color.FromRgb(108, 106, 98)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(0, 0, 12, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(cell, column);
+        grid.Children.Add(cell);
     }
 
     private void AddFormatRows(FileKindSummary kind)
     {
         var byExtension = kind.Items.ToDictionary(item => item.Extension, StringComparer.OrdinalIgnoreCase);
         var rows = new StackPanel { Margin = new Thickness(0, 8, 0, 22) };
+        rows.Children.Add(MakeFormatTableHeader());
 
         foreach (var extension in kind.Extensions)
         {
             byExtension.TryGetValue(extension, out var item);
+            var isSelected = string.Equals(_state.SelectedFormat?.Extension, extension, StringComparison.OrdinalIgnoreCase);
             rows.Children.Add(MakeFormatRowButton(
                 extension,
                 item?.Description ?? extension,
                 DisplaySummaryAppName(item?.FriendlyName ?? item?.ProgId, kind),
-                item?.Icon));
+                item?.Icon,
+                isSelected));
         }
 
         DetailPanel.Children.Add(rows);
     }
 
-    private Button MakeFormatRowButton(string extension, string description, string appName, AppIconLocation? icon)
+    private Grid MakeFormatTableHeader()
+    {
+        var content = MakeFormatRowGrid();
+        content.Margin = new Thickness(12, 0, 12, 6);
+        AddFormatHeaderCell(content, t("formatTableFormat"), 0);
+        AddFormatHeaderCell(content, t("formatTableDescription"), 1);
+        AddFormatHeaderCell(content, t("formatTableCurrentApp"), 2);
+        return content;
+    }
+
+    private static void AddFormatHeaderCell(Grid grid, string text, int column)
+    {
+        var label = new TextBlock
+        {
+            Text = text,
+            Foreground = new SolidColorBrush(Color.FromRgb(122, 119, 111)),
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Margin = column == 2 ? new Thickness(32, 0, 0, 0) : new Thickness(0),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        Grid.SetColumn(label, column);
+        grid.Children.Add(label);
+    }
+
+    private static Grid MakeFormatRowGrid()
     {
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+        return content;
+    }
+
+    private Button MakeFormatRowButton(string extension, string description, string appName, AppIconLocation? icon, bool isSelected)
+    {
+        var content = MakeFormatRowGrid();
 
         var code = new TextBlock
         {
@@ -606,7 +697,9 @@ public partial class MainWindow : Window
             Style = (Style)FindResource("BaseButton"),
             Margin = new Thickness(0, 0, 0, 8),
             Padding = new Thickness(12, 9, 12, 9),
-            HorizontalContentAlignment = HorizontalAlignment.Stretch
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            BorderBrush = new SolidColorBrush(isSelected ? Color.FromRgb(37, 39, 33) : Color.FromRgb(216, 213, 204)),
+            Background = new SolidColorBrush(isSelected ? Color.FromRgb(246, 244, 237) : Color.FromRgb(255, 254, 250))
         };
         button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
         return button;
@@ -759,6 +852,18 @@ public partial class MainWindow : Window
             "ShellHandler" => t("availableApp"),
             "OpenWithProgids" => t("knownForFormat"),
             "OpenWithList" => t("usedBefore"),
+            _ => source
+        };
+    }
+
+    private string TechnicalSourceLabel(string source)
+    {
+        return source switch
+        {
+            "UserChoice" => t("sourceUserChoice"),
+            "Shell" => t("sourceShell"),
+            "Registry" => t("sourceRegistry"),
+            "Unknown" => t("sourceUnknown"),
             _ => source
         };
     }
