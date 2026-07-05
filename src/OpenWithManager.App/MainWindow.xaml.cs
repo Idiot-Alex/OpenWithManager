@@ -302,18 +302,9 @@ public partial class MainWindow : Window
         var item = _state.SelectedKind?.Items.FirstOrDefault(value => value.Extension == format.Extension);
         _state.SelectedCandidate ??= format.Current ?? format.Candidates.FirstOrDefault();
 
-        var back = MakeButton(t("backToFileKind"), (_, _) =>
-        {
-            _state.SelectedFormat = null;
-            _state.SelectedCandidate = null;
-            RenderDetail();
-        });
-        DetailPanel.Children.Add(back);
-
-        AddEyebrow(t("format"));
-        AddTitle(item?.Description ?? format.Extension);
-        AddSection(t("currentApp"), DisplayAppName(format.Current?.AppName), true);
-        AddSectionLabel(t("recommendedApps"));
+        AddFormatHeader(format, item);
+        AddFormatActions(format);
+        AddSectionLabel(t("availableApps"));
 
         if (format.Candidates.Count == 0)
         {
@@ -328,6 +319,29 @@ public partial class MainWindow : Window
             }
         }
 
+        if (item is not null)
+        {
+            AddTechnicalItems([item]);
+        }
+    }
+
+    private void AddFormatHeader(FormatCandidateResult format, FileAssociationItem? item)
+    {
+        var back = MakeButton(t("backToFileKind"), (_, _) =>
+        {
+            _state.SelectedFormat = null;
+            _state.SelectedCandidate = null;
+            RenderDetail();
+        });
+        DetailPanel.Children.Add(back);
+
+        AddEyebrow(FormatExtensionLabel(format.Extension));
+        AddTitle(item?.Description ?? format.Description);
+        AddSummary(t("currentUsing", ("app", DisplayAppName(format.Current?.AppName))));
+    }
+
+    private void AddFormatActions(FormatCandidateResult format)
+    {
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 8) };
         actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
         if (_state.SelectedCandidate?.CanMakeDefault == true)
@@ -337,10 +351,6 @@ public partial class MainWindow : Window
         DetailPanel.Children.Add(actions);
 
         AddMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
-        if (item is not null)
-        {
-            AddTechnicalItems([item]);
-        }
     }
 
     private Button MakeCandidateButton(FormatAppCandidate candidate)
@@ -402,24 +412,29 @@ public partial class MainWindow : Window
 
     private FrameworkElement MakeCandidateIcon(FormatAppCandidate candidate)
     {
-        var icon = _icons.GetIcon(candidate.Icon);
+        return MakeAppIcon(candidate.Icon, candidate.AppName, 30, 20, new Thickness(0, 0, 10, 0));
+    }
+
+    private FrameworkElement MakeAppIcon(AppIconLocation? location, string appName, double holderSize, double iconSize, Thickness margin)
+    {
+        var icon = _icons.GetIcon(location);
         var holder = new Border
         {
-            Width = 30,
-            Height = 30,
-            Margin = new Thickness(0, 0, 10, 0),
+            Width = holderSize,
+            Height = holderSize,
+            Margin = margin,
             Background = new SolidColorBrush(Color.FromRgb(240, 238, 230)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(221, 217, 207)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(7)
+            CornerRadius = new CornerRadius(holderSize >= 30 ? 7 : 6)
         };
 
         holder.Child = icon is null
             ? new TextBlock
             {
-                Text = CandidateInitial(candidate.AppName),
+                Text = CandidateInitial(appName),
                 Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
-                FontSize = 12,
+                FontSize = holderSize >= 30 ? 12 : 10,
                 FontWeight = FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
@@ -427,8 +442,8 @@ public partial class MainWindow : Window
             : new Image
             {
                 Source = icon,
-                Width = 20,
-                Height = 20,
+                Width = iconSize,
+                Height = iconSize,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -530,18 +545,19 @@ public partial class MainWindow : Window
             rows.Children.Add(MakeFormatRowButton(
                 extension,
                 item?.Description ?? extension,
-                DisplaySummaryAppName(item?.FriendlyName ?? item?.ProgId, kind)));
+                DisplaySummaryAppName(item?.FriendlyName ?? item?.ProgId, kind),
+                item?.Icon));
         }
 
         DetailPanel.Children.Add(rows);
     }
 
-    private Button MakeFormatRowButton(string extension, string description, string appName)
+    private Button MakeFormatRowButton(string extension, string description, string appName, AppIconLocation? icon)
     {
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
 
         var code = new TextBlock
         {
@@ -559,13 +575,21 @@ public partial class MainWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var app = new TextBlock
+        var app = new Grid();
+        app.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        app.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        app.Children.Add(MakeAppIcon(icon, appName, 24, 16, new Thickness(0, 0, 8, 0)));
+
+        var appNameText = new TextBlock
         {
             Text = appName,
             Foreground = new SolidColorBrush(Color.FromRgb(108, 106, 98)),
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
+        Grid.SetColumn(appNameText, 1);
+        app.Children.Add(appNameText);
+
         Grid.SetColumn(descriptionText, 1);
         Grid.SetColumn(app, 2);
         content.Children.Add(code);
@@ -583,27 +607,6 @@ public partial class MainWindow : Window
         };
         button.Click += async (_, _) => await SelectFormatAsync((string)button.Tag);
         return button;
-    }
-
-    private void AddSection(string label, string value, bool large = false)
-    {
-        AddSectionLabel(label);
-        DetailPanel.Children.Add(new Border
-        {
-            Margin = new Thickness(0, 8, 0, 22),
-            Padding = new Thickness(16),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(222, 219, 211)),
-            BorderThickness = new Thickness(1),
-            Background = new SolidColorBrush(Color.FromRgb(246, 244, 237)),
-            CornerRadius = new CornerRadius(8),
-            Child = new TextBlock
-            {
-                Text = value,
-                FontSize = large ? 20 : 14,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(37, 39, 33))
-            }
-        });
     }
 
     private void AddTitle(string text)
