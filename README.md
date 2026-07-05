@@ -14,9 +14,11 @@ This project uses:
 - Filter by file type
 - Open Windows default apps settings
 - Show candidate apps for a selected file format
-- Set a default app only after an explicit user confirmation, using Windows Shell association APIs
+- Guide users to change a default app in Windows Settings
 
-The app must not silently or forcibly change default app associations. Windows 10/11 protects default app choices, and direct registry writes can be ignored or reset by the OS. Any default app change should be user-initiated, confirmed in the UI, and performed through supported Windows Shell or Settings flows.
+The app must not silently, forcibly, or programmatically change default app associations. Windows 10/11 protects default app choices, and direct registry writes or legacy Shell association APIs can be ignored or reset by the OS. Any default app change should be user-initiated and confirmed in official Windows Settings pages.
+
+Windows Settings does not expose a stable public URI that opens the candidate app picker for a specific extension such as `.js`. The app can open the default apps page or an app-specific defaults page when Windows supports it, then help the user search for the extension.
 
 ## Requirements
 

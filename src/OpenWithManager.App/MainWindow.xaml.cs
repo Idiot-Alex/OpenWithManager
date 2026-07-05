@@ -344,10 +344,7 @@ public partial class MainWindow : Window
     {
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 22, 0, 8) };
         actions.Children.Add(MakeButton(FormatActionLabel(_state.SelectedCandidate), async (_, _) => await OpenFormatSettingsAsync(format.Extension, _state.SelectedCandidate), true));
-        if (_state.SelectedCandidate?.CanMakeDefault == true)
-        {
-            actions.Children.Add(MakeButton(t("setAsDefault"), async (_, _) => await MakeFormatDefaultAsync(format.Extension, _state.SelectedCandidate)));
-        }
+        actions.Children.Add(MakeButton(t("copyFormat"), (_, _) => CopyFormatToClipboard(format.Extension)));
         DetailPanel.Children.Add(actions);
 
         AddMuted(FormatSettingsHint(format.Extension, _state.SelectedCandidate));
@@ -464,6 +461,13 @@ public partial class MainWindow : Window
         MessageBox.Show(this, FormatSettingsHint(extension, candidate), t("openSettings"), MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+    private void CopyFormatToClipboard(string extension)
+    {
+        var label = FormatExtensionLabel(extension);
+        Clipboard.SetText(label);
+        MessageBox.Show(this, t("formatCopied", ("extension", label)), t("copyFormat"), MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private async Task RefreshAfterExternalSettingsAsync()
     {
         if (!_refreshOnNextActivation || _state.IsLoading)
@@ -477,38 +481,6 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(selectedExtension))
         {
             await SelectFormatAsync(selectedExtension);
-        }
-    }
-
-    private async Task MakeFormatDefaultAsync(string extension, FormatAppCandidate? candidate)
-    {
-        if (candidate?.CanMakeDefault != true || string.IsNullOrWhiteSpace(candidate.ShellHandlerId))
-        {
-            return;
-        }
-
-        var result = MessageBox.Show(
-            this,
-            t("confirmSetDefault", ("extension", FormatCode(extension)), ("app", DisplayAppName(candidate.AppName))),
-            t("setAsDefault"),
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
-
-        if (result != MessageBoxResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            await Task.Run(() => _shellAssociations.MakeDefault(extension, candidate.ShellHandlerId, candidate.AppName));
-            MessageBox.Show(this, t("setDefaultToast", ("extension", FormatCode(extension)), ("app", DisplayAppName(candidate.AppName))), t("setAsDefault"), MessageBoxButton.OK, MessageBoxImage.Information);
-            await LoadFileKindsAsync();
-            await SelectFormatAsync(extension);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, t("setAsDefault"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -706,7 +678,7 @@ public partial class MainWindow : Window
     private string FormatSettingsHint(string extension, FormatAppCandidate? candidate)
     {
         var key = HasAppSettingsLink(candidate) ? "appDefaultsHint" : "formatSettingsHint";
-        return t(key, ("extension", FormatCode(extension)), ("app", DisplayAppName(candidate?.AppName)));
+        return t(key, ("extension", FormatExtensionLabel(extension)), ("app", DisplayAppName(candidate?.AppName)));
     }
 
     private static bool HasAppSettingsLink(FormatAppCandidate? candidate)

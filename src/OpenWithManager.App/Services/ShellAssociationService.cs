@@ -13,19 +13,6 @@ public sealed class ShellAssociationService
         return candidates;
     }
 
-    public void MakeDefault(string extension, string shellHandlerId, string appName)
-    {
-        var handler = FindHandler(extension, shellHandlerId)
-            ?? throw new InvalidOperationException("The selected app is no longer available for this format.");
-
-        var result = handler.MakeDefault(appName);
-        Marshal.ReleaseComObject(handler);
-        if (result < 0)
-        {
-            Marshal.ThrowExceptionForHR(result);
-        }
-    }
-
     private static IEnumerable<FormatAppCandidate> ReadHandlers(
         string extension,
         AssocFilter filter,
@@ -44,8 +31,7 @@ public sealed class ShellAssociationService
                 try
                 {
                     var appName = ReadComString(handler.GetUIName) ?? ReadComString(handler.GetName);
-                    var handlerId = ReadComString(handler.GetName) ?? appName;
-                    if (string.IsNullOrWhiteSpace(appName) || string.IsNullOrWhiteSpace(handlerId))
+                    if (string.IsNullOrWhiteSpace(appName))
                     {
                         continue;
                     }
@@ -55,9 +41,7 @@ public sealed class ShellAssociationService
                         null,
                         ReadIconLocation(handler),
                         source,
-                        false,
-                        ShellHandlerId: handlerId,
-                        CanMakeDefault: true);
+                        false);
                 }
                 finally
                 {
@@ -69,35 +53,6 @@ public sealed class ShellAssociationService
         {
             Marshal.ReleaseComObject(handlers);
         }
-    }
-
-    private static IAssocHandler? FindHandler(string extension, string shellHandlerId)
-    {
-        var result = SHAssocEnumHandlers(extension, AssocFilter.None, out var handlers);
-        if (result < 0 || handlers is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            while (handlers.Next(1, out var handler, out var fetched) == 0 && fetched == 1)
-            {
-                var handlerId = ReadComString(handler.GetName);
-                if (string.Equals(handlerId, shellHandlerId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return handler;
-                }
-
-                Marshal.ReleaseComObject(handler);
-            }
-        }
-        finally
-        {
-            Marshal.ReleaseComObject(handlers);
-        }
-
-        return null;
     }
 
     private delegate int ReadComStringCallback(out IntPtr value);
@@ -177,17 +132,5 @@ public sealed class ShellAssociationService
 
         [PreserveSig]
         int GetIconLocation(out IntPtr ppszPath, out int pIndex);
-
-        [PreserveSig]
-        int IsRecommended();
-
-        [PreserveSig]
-        int MakeDefault([MarshalAs(UnmanagedType.LPWStr)] string pszDescription);
-
-        [PreserveSig]
-        int Invoke(IntPtr pdo);
-
-        [PreserveSig]
-        int CreateInvoker(IntPtr pdo, out IntPtr ppInvoker);
     }
 }

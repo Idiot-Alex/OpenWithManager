@@ -48,4 +48,4 @@ Pull requests should include a short description, manual verification steps, lin
 
 ## Security & Configuration Tips
 
-Do not silently or forcibly change default app associations. Windows 10/11 protects these choices, and direct registry writes can be ignored or reset. Prefer read-only inspection and official Windows Settings pages. When the app offers a default-app change, it must be clearly user-initiated, require explicit confirmation, and use supported Windows Shell or Settings flows rather than direct registry writes.
+Do not silently, forcibly, or programmatically change default app associations. Windows 10/11 protects these choices, and direct registry writes or legacy Shell association APIs can be ignored or reset. Prefer read-only inspection and official Windows Settings pages. When the app offers a default-app change, it must guide the user to confirm the change in Windows Settings rather than writing associations directly.

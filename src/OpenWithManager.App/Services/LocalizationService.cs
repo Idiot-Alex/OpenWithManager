@@ -26,8 +26,10 @@ public sealed class LocalizationService
         ["noCandidateApps"] = "No candidate apps found.",
         ["changeInWindows"] = "Change in Windows",
         ["openAppDefaults"] = "Open app defaults",
-        ["formatSettingsHint"] = "Windows will ask you to choose {app} for {extension}.",
-        ["appDefaultsHint"] = "Windows will open {app}'s default app page. Find {extension} there and confirm your choice.",
+        ["copyFormat"] = "Copy format",
+        ["formatCopied"] = "{extension} copied.",
+        ["formatSettingsHint"] = "Windows does not provide a direct extension link here. Open Settings, paste {extension} in the file type search, then choose an app.",
+        ["appDefaultsHint"] = "Windows will try to open {app}'s default app page. If it opens the default apps page instead, paste {extension} in the file type search.",
         ["formats"] = "Formats",
         ["openDefaultApps"] = "Open default apps",
         ["technicalDetails"] = "Technical details",
@@ -43,9 +45,6 @@ public sealed class LocalizationService
         ["loadFailedTitle"] = "Could not read defaults",
         ["current"] = "Current",
         ["none"] = "none",
-        ["setAsDefault"] = "Set as default",
-        ["confirmSetDefault"] = "Set {app} as the default app for {extension}? This will immediately change your Windows default app setting.",
-        ["setDefaultToast"] = "{extension} now opens with {app}.",
         ["openSettings"] = "Open settings"
     };
 
@@ -73,8 +72,10 @@ public sealed class LocalizationService
         ["noCandidateApps"] = "没有找到候选应用。",
         ["changeInWindows"] = "在 Windows 中更改",
         ["openAppDefaults"] = "打开应用默认设置",
-        ["formatSettingsHint"] = "Windows 会让你为 {extension} 选择 {app}。",
-        ["appDefaultsHint"] = "Windows 会打开 {app} 的默认应用页面，请在其中找到 {extension} 并确认选择。",
+        ["copyFormat"] = "复制格式名",
+        ["formatCopied"] = "已复制 {extension}。",
+        ["formatSettingsHint"] = "Windows 没有提供按扩展名直达候选列表的公开入口。打开设置后，将 {extension} 粘贴到文件类型搜索框，再选择应用。",
+        ["appDefaultsHint"] = "Windows 会尝试打开 {app} 的默认应用页面。如果只打开默认应用页，请将 {extension} 粘贴到文件类型搜索框。",
         ["formats"] = "格式",
         ["openDefaultApps"] = "默认应用",
         ["technicalDetails"] = "技术明细",
@@ -90,9 +91,6 @@ public sealed class LocalizationService
         ["loadFailedTitle"] = "无法读取默认项",
         ["current"] = "当前",
         ["none"] = "无",
-        ["setAsDefault"] = "设为默认",
-        ["confirmSetDefault"] = "要将 {extension} 的默认打开应用改为 {app} 吗？此操作会立即修改 Windows 默认应用设置。",
-        ["setDefaultToast"] = "{extension} 现在将使用 {app} 打开。",
         ["openSettings"] = "打开设置"
     };
 

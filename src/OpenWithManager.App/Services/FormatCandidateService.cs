@@ -49,17 +49,13 @@ public sealed class FormatCandidateService
                 var settingsTarget = group.FirstOrDefault(candidate =>
                     !string.IsNullOrWhiteSpace(candidate.SettingsParameterName)
                     && !string.IsNullOrWhiteSpace(candidate.SettingsParameterValue));
-                var shellTarget = group.FirstOrDefault(candidate =>
-                    !string.IsNullOrWhiteSpace(candidate.ShellHandlerId));
                 var iconTarget = group.FirstOrDefault(candidate => candidate.Icon is not null);
 
                 return selected with
                 {
                     Icon = selected.Icon ?? iconTarget?.Icon,
                     SettingsParameterName = settingsTarget?.SettingsParameterName ?? selected.SettingsParameterName,
-                    SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue,
-                    ShellHandlerId = shellTarget?.ShellHandlerId ?? selected.ShellHandlerId,
-                    CanMakeDefault = shellTarget?.CanMakeDefault ?? selected.CanMakeDefault
+                    SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue
                 };
             })
             .OrderByDescending(candidate => candidate.IsCurrent)
