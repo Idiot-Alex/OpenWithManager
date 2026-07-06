@@ -563,7 +563,7 @@ public partial class MainWindow : Window
 
     private FrameworkElement MakeAppIcon(AppIconLocation? location, string appName, double holderSize, double iconSize, Thickness margin)
     {
-        var icon = _icons.GetIcon(location);
+        var icon = IsUnsetAppName(appName) ? null : _icons.GetIcon(location);
         var holder = new Border
         {
             Width = holderSize,
@@ -604,6 +604,11 @@ public partial class MainWindow : Window
 
     private static string GetAppInitial(string appName)
     {
+        if (IsUnsetAppName(appName))
+        {
+            return "?";
+        }
+
         var initial = appName.FirstOrDefault(char.IsLetterOrDigit);
         return initial == default ? "?" : char.ToUpperInvariant(initial).ToString();
     }
@@ -950,6 +955,11 @@ public partial class MainWindow : Window
     private string DisplayAppName(string? name)
     {
         return string.IsNullOrWhiteSpace(name) || name == "No default app" ? t("noDefaultApp") : name;
+    }
+
+    private static bool IsUnsetAppName(string? name)
+    {
+        return string.IsNullOrWhiteSpace(name) || string.Equals(name, "No default app", StringComparison.OrdinalIgnoreCase);
     }
 
     private string FormatActionLabel(FormatAppCandidate? candidate)

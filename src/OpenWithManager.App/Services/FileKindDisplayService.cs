@@ -66,7 +66,7 @@ public sealed class FileKindDisplayService
             {
                 AppName = DisplaySummaryAppName(group.First().AppName, kind),
                 Count = group.Count(),
-                Icon = group.Select(item => item.Item.Icon).FirstOrDefault(icon => icon is not null)
+                Icon = IsUnsetAppName(group.First().AppName) ? null : group.Select(item => item.Item.Icon).FirstOrDefault(icon => icon is not null)
             })
             .OrderByDescending(group => group.Count)
             .ThenBy(group => group.AppName)
@@ -104,6 +104,11 @@ public sealed class FileKindDisplayService
     private string DisplayAppName(string? name)
     {
         return string.IsNullOrWhiteSpace(name) || name == "No default app" ? T("noDefaultApp") : name;
+    }
+
+    private static bool IsUnsetAppName(string? name)
+    {
+        return string.IsNullOrWhiteSpace(name) || string.Equals(name, "No default app", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsFileKindName(string name, FileKindSummary kind)
