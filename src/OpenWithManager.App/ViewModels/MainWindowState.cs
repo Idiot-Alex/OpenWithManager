@@ -11,5 +11,7 @@ public sealed class MainWindowState
     public FormatCandidateResult? SelectedFormat { get; set; }
     public FormatAppCandidate? SelectedCandidate { get; set; }
     public bool IsLoading { get; set; }
+    public bool IsLoadingCandidates { get; set; }
+    public string? LoadingFormatExtension { get; set; }
     public string? LoadError { get; set; }
 }

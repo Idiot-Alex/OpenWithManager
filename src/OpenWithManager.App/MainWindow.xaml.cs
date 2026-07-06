@@ -184,6 +184,8 @@ public partial class MainWindow : Window
         _formatSelectionVersion++;
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
+        _state.IsLoadingCandidates = false;
+        _state.LoadingFormatExtension = null;
     }
 
     private void RenderLoading()
@@ -223,7 +225,11 @@ public partial class MainWindow : Window
             AddHeaderMuted(t("readingDefaultsBody"));
         }
 
-        if (_state.SelectedFormat is not null)
+        if (_state.IsLoadingCandidates)
+        {
+            AddLoadingFormatPanel();
+        }
+        else if (_state.SelectedFormat is not null)
         {
             AddSelectedFormatPanel(_state.SelectedFormat);
         }
@@ -345,7 +351,7 @@ public partial class MainWindow : Window
 
     private async Task SelectFirstFormatIfNeededAsync()
     {
-        if (_state.LoadError is not null || _state.SelectedKind is null || _state.SelectedFormat is not null)
+        if (_state.LoadError is not null || _state.SelectedKind is null || _state.SelectedFormat is not null || _state.IsLoadingCandidates)
         {
             return;
         }
@@ -365,6 +371,11 @@ public partial class MainWindow : Window
         var selectedKindId = _state.SelectedKind?.Id;
         _state.SelectedFormat = null;
         _state.SelectedCandidate = null;
+        _state.IsLoadingCandidates = true;
+        _state.LoadingFormatExtension = NormalizeExtension(extension);
+        RenderDetail();
+        FormatWorkScrollViewer.ScrollToTop();
+
         try
         {
             var result = await Task.Run(() => _formatCandidates.GetCandidates(extension));
@@ -375,6 +386,8 @@ public partial class MainWindow : Window
 
             _state.SelectedFormat = result;
             _state.SelectedCandidate = result.Current ?? result.Candidates.FirstOrDefault();
+            _state.IsLoadingCandidates = false;
+            _state.LoadingFormatExtension = null;
         }
         catch (Exception ex)
         {
@@ -383,6 +396,8 @@ public partial class MainWindow : Window
                 return;
             }
 
+            _state.IsLoadingCandidates = false;
+            _state.LoadingFormatExtension = null;
             ShowToast(ex.Message, true);
         }
 
@@ -393,6 +408,24 @@ public partial class MainWindow : Window
 
         RenderDetail();
         FormatWorkScrollViewer.ScrollToTop();
+    }
+
+    private void AddLoadingFormatPanel()
+    {
+        AddWorkSectionLabel(t("formatActions"));
+        if (!string.IsNullOrWhiteSpace(_state.LoadingFormatExtension))
+        {
+            FormatWorkPanel.Children.Add(new TextBlock
+            {
+                Text = FormatExtensionLabel(_state.LoadingFormatExtension),
+                Foreground = UiBrush(UiInkColor),
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 8, 0, 4)
+            });
+        }
+
+        AddWorkMuted(FormatWorkPanel, t("loadingApps"), new Thickness(0, 4, 0, 8));
     }
 
     private void AddSelectedFormatPanel(FormatCandidateResult format)
@@ -725,7 +758,8 @@ public partial class MainWindow : Window
         foreach (var extension in kind.Extensions)
         {
             byExtension.TryGetValue(extension, out var item);
-            var isSelected = string.Equals(_state.SelectedFormat?.Extension, extension, StringComparison.OrdinalIgnoreCase);
+            var isSelected = string.Equals(_state.SelectedFormat?.Extension, extension, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(_state.LoadingFormatExtension, NormalizeExtension(extension), StringComparison.OrdinalIgnoreCase);
             rows.Children.Add(MakeFormatRowButton(
                 extension,
                 item?.Description ?? extension,
@@ -1014,6 +1048,12 @@ public partial class MainWindow : Window
         return $".{FormatCode(extension)}";
     }
 
+    private static string NormalizeExtension(string extension)
+    {
+        var value = extension.Trim();
+        return value.StartsWith('.') ? value.ToLowerInvariant() : $".{value.ToLowerInvariant()}";
+    }
+
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
     {
         _state.Query = SearchBox.Text.Trim();
@@ -1036,6 +1076,11 @@ public partial class MainWindow : Window
 
     private async void OnRefreshClicked(object sender, RoutedEventArgs e)
     {
+        if (_state.IsLoading)
+        {
+            return;
+        }
+
         await LoadFileKindsAsync();
     }
 
@@ -1132,6 +1177,7 @@ public partial class MainWindow : Window
         SearchPlaceholderText.Text = t("searchPlaceholder");
         UpdateSearchPlaceholder();
         RefreshButton.Content = t("refresh");
+        RefreshButton.IsEnabled = !_state.IsLoading;
         PreferencesButton.Content = t("preferences");
         FileKindsLabel.Text = t("fileKinds");
         SyncPreferencesPanel();
