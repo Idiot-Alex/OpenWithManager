@@ -7,4 +7,5 @@ public sealed record FormatAppCandidate(
     string Source,
     bool IsCurrent,
     string? SettingsParameterName = null,
-    string? SettingsParameterValue = null);
+    string? SettingsParameterValue = null,
+    string? Diagnostic = null);

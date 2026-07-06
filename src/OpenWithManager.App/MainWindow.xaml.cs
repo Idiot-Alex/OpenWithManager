@@ -538,15 +538,31 @@ public partial class MainWindow : Window
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+        var nameStack = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center
+        };
         var name = new TextBlock
         {
             Text = DisplayAppName(candidate.AppName),
             FontWeight = FontWeights.SemiBold,
             Foreground = UiBrush(UiInkColor),
-            VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        Grid.SetColumn(name, 1);
+        nameStack.Children.Add(name);
+        if (_preferences.ShowCandidateSources)
+        {
+            nameStack.Children.Add(new TextBlock
+            {
+                Text = AppCandidateIdentityService.FormatCompactDiagnostic(candidate),
+                Foreground = UiBrush(UiMutedColor),
+                FontSize = 11,
+                Margin = new Thickness(0, 3, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+        }
+
+        Grid.SetColumn(nameStack, 1);
         var source = new Border
         {
             Padding = new Thickness(8, 4, 8, 4),
@@ -566,7 +582,7 @@ public partial class MainWindow : Window
         };
         Grid.SetColumn(source, 2);
         content.Children.Add(MakeCandidateIcon(candidate));
-        content.Children.Add(name);
+        content.Children.Add(nameStack);
         content.Children.Add(source);
 
         var button = new Button
