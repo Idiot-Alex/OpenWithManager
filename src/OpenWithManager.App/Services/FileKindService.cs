@@ -16,9 +16,28 @@ public sealed class FileKindService
         _fileAssociations = fileAssociations;
     }
 
-    public List<FileKindSummary> GetFileKinds()
+    public List<FileKindSummary> GetFileKinds(IProgress<IReadOnlyList<FileKindSummary>>? progress = null)
     {
-        var associations = _fileAssociations.GetKnownAssociations();
+        var associations = new List<FileAssociationItem>();
+        var count = 0;
+        foreach (var association in _fileAssociations.EnumerateKnownAssociations())
+        {
+            associations.Add(association);
+            count++;
+
+            if (progress is not null && (count == 8 || count % 24 == 0))
+            {
+                progress.Report(BuildFileKinds(associations));
+            }
+        }
+
+        var fileKinds = BuildFileKinds(associations);
+        progress?.Report(fileKinds);
+        return fileKinds;
+    }
+
+    private static List<FileKindSummary> BuildFileKinds(IReadOnlyCollection<FileAssociationItem> associations)
+    {
         var byCategory = associations
             .GroupBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -104,6 +123,6 @@ public sealed class FileKindService
 
     private static string DisplayAppName(FileAssociationItem item)
     {
-        return item.FriendlyName ?? item.ProgId ?? "No default app";
+        return FileAssociationService.ReadVerifiedAppName(item) ?? "No default app";
     }
 }

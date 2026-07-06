@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -9,6 +10,13 @@ namespace OpenWithManager.App.Services;
 
 public sealed class FileAssociationService
 {
+    private static readonly Guid IidIUnknown = new("00000000-0000-0000-C000-000000000046");
+    private static readonly ConcurrentDictionary<string, bool> ApplicationEvidenceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, bool> ProgIdEvidenceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, bool> ShellApplicationEvidenceCache = new(StringComparer.OrdinalIgnoreCase);
+    private const string AppsFolderPrefix = @"shell:AppsFolder\";
+    private const string AppsFolderGuidPrefix = @"shell:::{4234d49b-0245-4df3-b780-3893943456e1}\";
+
     private static readonly KnownExtension[] SeedKnownExtensions =
     [
         new(".pdf", "PDF document", "application/pdf", "document"),
@@ -42,11 +50,18 @@ public sealed class FileAssociationService
 
     public List<FileAssociationItem> GetKnownAssociations()
     {
-        return DiscoverExtensions()
-            .Select(ReadAssociation)
+        return EnumerateKnownAssociations()
             .OrderBy(item => item.Category)
             .ThenBy(item => item.Extension)
             .ToList();
+    }
+
+    public IEnumerable<FileAssociationItem> EnumerateKnownAssociations()
+    {
+        foreach (var extension in DiscoverExtensions().OrderBy(item => item.Extension, StringComparer.OrdinalIgnoreCase))
+        {
+            yield return ReadAssociation(extension);
+        }
     }
 
     public FileAssociationItem GetAssociation(string extension)
@@ -113,14 +128,19 @@ public sealed class FileAssociationService
                 extension.PerceivedType);
         }
 
-        AddClassesRootExtensions(extensions);
+        AddKnownClassesRootExtensions(extensions);
         AddCurrentUserExtensions(extensions);
         return extensions.Values.ToList();
     }
 
-    private static void AddClassesRootExtensions(IDictionary<string, ExtensionMetadata> extensions)
+    private static void AddKnownClassesRootExtensions(IDictionary<string, ExtensionMetadata> extensions)
     {
-        foreach (var extension in SafeGetSubKeyNames(Registry.ClassesRoot))
+        var knownExtensions = SeedKnownExtensions
+            .Select(extension => extension.Extension)
+            .Concat(FileFormatClassifier.KnownExtensions)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var extension in knownExtensions)
         {
             if (!IsExtensionName(extension))
             {
@@ -149,7 +169,13 @@ public sealed class FileAssociationService
         {
             if (IsExtensionName(extension))
             {
-                AddOrUpdateExtension(extensions, extension, null, null, null);
+                using var key = SafeOpenSubKey(Registry.ClassesRoot, extension);
+                AddOrUpdateExtension(
+                    extensions,
+                    extension,
+                    key?.GetValue(null) as string,
+                    key?.GetValue("Content Type") as string,
+                    key?.GetValue("PerceivedType") as string);
             }
         }
     }
@@ -294,7 +320,7 @@ public sealed class FileAssociationService
 
     private static string? FirstAppLikeName(string? value, string? documentName, string description)
     {
-        if (string.IsNullOrWhiteSpace(value) || IsDocumentName(value, documentName, description) || IsPlaceholderAppName(value))
+        if (!IsUsableAppName(value, documentName, description))
         {
             return null;
         }
@@ -302,16 +328,40 @@ public sealed class FileAssociationService
         return value;
     }
 
-    private static bool IsDocumentName(string value, string? documentName, string description)
+    public static bool IsUsableAppName(string? value, string? documentName = null, string? description = null)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && !IsPlaceholderAppName(value)
+            && !IsDocumentName(value, documentName, description);
+    }
+
+    private static bool IsDocumentName(string value, string? documentName, string? description)
     {
         var candidate = NormalizeName(value);
-        return candidate == NormalizeName(documentName)
-            || candidate == NormalizeName(description);
+        return IsSameOrNestedDocumentName(candidate, NormalizeName(documentName))
+            || IsSameOrNestedDocumentName(candidate, NormalizeName(description));
+    }
+
+    private static bool IsSameOrNestedDocumentName(string candidate, string documentName)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(documentName))
+        {
+            return false;
+        }
+
+        return candidate == documentName
+            || candidate.Length >= 8 && documentName.Contains(candidate, StringComparison.Ordinal)
+            || documentName.Length >= 8 && candidate.Contains(documentName, StringComparison.Ordinal);
     }
 
     private static bool IsPlaceholderAppName(string value)
     {
         var normalized = NormalizeName(value);
+        if (normalized is "pickanapp")
+        {
+            return true;
+        }
+
         return normalized is "chooseanapp" or "selectanapp" or "chooseapp" or "选取应用" or "选择应用";
     }
 
@@ -356,18 +406,19 @@ public sealed class FileAssociationService
             return null;
         }
 
-        return ReadRegistryShellApplicationIconLocation($@"{progId}\Application")
-            ?? ReadRegistryApplicationIconLocation($@"{progId}\Application")
+        return ReadRegistryApplicationIconLocation($@"{progId}\Application")
             ?? ReadRegistryOpenCommandIconLocation($@"{progId}\shell\open\command")
-            ?? ReadRegistryIconLocation($@"{progId}\DefaultIcon");
+            ?? ReadRegistryIconLocation($@"{progId}\DefaultIcon")
+            ?? ReadRegistryShellApplicationIconLocation($@"{progId}\Application");
     }
 
     public static AppIconLocation? ReadCurrentAppIconLocation(string extension, string? progId)
     {
-        return ReadRegistryShellApplicationIconLocation(progId is null ? null : $@"{progId}\Application")
-            ?? ParseIconLocation(ReadRawAssociationString(extension, AssocString.AppIconReference))
+        return ParseIconLocation(ReadRawAssociationString(extension, AssocString.AppIconReference))
+            ?? ReadProgIdApplicationIconLocation(progId)
             ?? ParseCommandLocation(ReadRawAssociationString(extension, AssocString.Executable))
             ?? ReadIconLocation(progId)
+            ?? ReadRegistryShellApplicationIconLocation(progId is null ? null : $@"{progId}\Application")
             ?? ParseIconLocation(ReadRawAssociationString(extension, AssocString.DefaultIcon));
     }
 
@@ -392,16 +443,135 @@ public sealed class FileAssociationService
         string? progId)
     {
         using var capabilities = hive.OpenSubKey(capabilitiesPath);
-        return ReadShellApplicationIconLocation(registeredApplicationName)
-            ?? ParseIconLocation(capabilities?.GetValue("ApplicationIcon") as string)
-            ?? ReadIconLocation(progId);
+        return ParseIconLocation(capabilities?.GetValue("ApplicationIcon") as string)
+            ?? ReadIconLocation(progId)
+            ?? ReadShellApplicationIconLocation(registeredApplicationName);
+    }
+
+    public static bool HasApplicationEvidence(string executableName)
+    {
+        return !string.IsNullOrWhiteSpace(executableName)
+            && ApplicationEvidenceCache.GetOrAdd(executableName, name => ResolveApplicationExecutablePath(name) is not null);
+    }
+
+    public static bool HasProgIdApplicationEvidence(string? progId)
+    {
+        if (string.IsNullOrWhiteSpace(progId))
+        {
+            return false;
+        }
+
+        return ProgIdEvidenceCache.GetOrAdd(progId, HasProgIdApplicationEvidenceCore);
+    }
+
+    public static bool HasProgIdRegisteredApplicationEvidence(string? progId)
+    {
+        if (string.IsNullOrWhiteSpace(progId))
+        {
+            return false;
+        }
+
+        if (progId.StartsWith(@"Applications\", StringComparison.OrdinalIgnoreCase))
+        {
+            return HasApplicationEvidence(progId[@"Applications\".Length..]);
+        }
+
+        using var applicationKey = Registry.ClassesRoot.OpenSubKey($@"{progId}\Application");
+        var appName = ResolveDisplayName(applicationKey?.GetValue("ApplicationName") as string);
+        var appUserModelId = applicationKey?.GetValue("AppUserModelID") as string
+            ?? applicationKey?.GetValue("AppUserModelId") as string;
+
+        return !string.IsNullOrWhiteSpace(appName)
+            || IsInstalledShellApplication(appUserModelId);
+    }
+
+    public static string? ReadInstalledProgIdApplicationName(string? progId)
+    {
+        if (!HasProgIdRegisteredApplicationEvidence(progId))
+        {
+            return null;
+        }
+
+        if (progId!.StartsWith(@"Applications\", StringComparison.OrdinalIgnoreCase))
+        {
+            var executableName = progId[@"Applications\".Length..];
+            return ReadExecutableDisplayName(ResolveApplicationExecutablePath(executableName))
+                ?? Path.GetFileNameWithoutExtension(executableName);
+        }
+
+        using var applicationKey = Registry.ClassesRoot.OpenSubKey($@"{progId}\Application");
+        return ResolveDisplayName(applicationKey?.GetValue("ApplicationName") as string)
+            ?? ReadExecutableDisplayName(ResolveProgIdExecutablePath(progId))
+            ?? progId;
+    }
+
+    public static string? ReadVerifiedAppName(FileAssociationItem item)
+    {
+        return ReadVerifiedAppName(item.ProgId, item.Icon, item.FriendlyName, item.Description);
+    }
+
+    public static string? ReadVerifiedAppName(
+        string? progId,
+        AppIconLocation? icon,
+        string? fallbackName,
+        string? description)
+    {
+        var installedAppName = ReadInstalledProgIdApplicationName(progId);
+        if (IsUsableAppName(installedAppName, description, description))
+        {
+            return installedAppName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(progId)
+            && (HasProgIdApplicationEvidence(progId) || IsResolvableIconLocation(icon))
+            && IsUsableAppName(fallbackName, description, description))
+        {
+            return fallbackName;
+        }
+
+        return null;
+    }
+
+    private static bool HasProgIdApplicationEvidenceCore(string progId)
+    {
+        if (progId.StartsWith(@"Applications\", StringComparison.OrdinalIgnoreCase))
+        {
+            return HasApplicationEvidence(progId[@"Applications\".Length..]);
+        }
+
+        return ReadRegistryShellApplicationIconLocation($@"{progId}\Application") is not null
+            || ResolveProgIdExecutablePath(progId) is not null;
+    }
+
+    public static bool HasRegisteredApplicationEvidence(
+        RegistryKey hive,
+        string capabilitiesPath,
+        string registeredApplicationName,
+        string? progId)
+    {
+        using var capabilities = hive.OpenSubKey(capabilitiesPath);
+        if (capabilities is null)
+        {
+            return false;
+        }
+
+        return ReadShellApplicationIconLocation(registeredApplicationName) is not null
+            || HasProgIdApplicationEvidence(progId)
+            || IsResolvableIconLocation(ParseIconLocation(capabilities.GetValue("ApplicationIcon") as string));
     }
 
     public static AppIconLocation? ReadShellApplicationIconLocation(string? appUserModelId)
     {
-        return !string.IsNullOrWhiteSpace(appUserModelId) && appUserModelId.Contains('!')
+        return IsInstalledShellApplication(appUserModelId)
             ? new AppIconLocation($@"shell:AppsFolder\{appUserModelId}")
             : null;
+    }
+
+    public static bool IsInstalledShellApplication(string? appUserModelId)
+    {
+        return !string.IsNullOrWhiteSpace(appUserModelId)
+            && appUserModelId.Contains('!')
+            && ShellApplicationEvidenceCache.GetOrAdd(appUserModelId, CanCreateAppsFolderItem);
     }
 
     private static AppIconLocation? ReadRegistryIconLocation(string keyPath)
@@ -414,6 +584,13 @@ public sealed class FileAssociationService
     {
         using var key = Registry.ClassesRoot.OpenSubKey(keyPath);
         return ParseIconLocation(key?.GetValue("ApplicationIcon") as string);
+    }
+
+    private static AppIconLocation? ReadProgIdApplicationIconLocation(string? progId)
+    {
+        return string.IsNullOrWhiteSpace(progId)
+            ? null
+            : ReadRegistryApplicationIconLocation($@"{progId}\Application");
     }
 
     private static AppIconLocation? ReadRegistryShellApplicationIconLocation(string? keyPath)
@@ -439,6 +616,192 @@ public sealed class FileAssociationService
     {
         using var key = hive.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\App Paths\{executableName}");
         return ParseCommandLocation(key?.GetValue(null) as string);
+    }
+
+    private static string? ResolveApplicationExecutablePath(string executableName)
+    {
+        if (string.IsNullOrWhiteSpace(executableName))
+        {
+            return null;
+        }
+
+        return ReadAppPathExecutablePath(Registry.CurrentUser, executableName)
+            ?? ReadAppPathExecutablePath(Registry.LocalMachine, executableName)
+            ?? ResolveApplicationsExecutablePath(executableName)
+            ?? ResolveExecutablePath(executableName);
+    }
+
+    private static string? ResolveProgIdExecutablePath(string progId)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey($@"{progId}\shell\open\command");
+        return ResolveExecutablePath(ParseCommandLocation(key?.GetValue(null) as string)?.Path ?? "");
+    }
+
+    private static string? ResolveApplicationsExecutablePath(string executableName)
+    {
+        using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{executableName}\shell\open\command");
+        return ResolveExecutablePath(ParseCommandLocation(key?.GetValue(null) as string)?.Path ?? "");
+    }
+
+    private static string? ReadAppPathExecutablePath(RegistryKey hive, string executableName)
+    {
+        using var key = hive.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\App Paths\{executableName}");
+        return ResolveExecutablePath(ParseCommandLocation(key?.GetValue(null) as string)?.Path ?? "");
+    }
+
+    private static string? ResolveExecutablePath(string value)
+    {
+        var path = Environment.ExpandEnvironmentVariables(value.Trim().Trim('"'));
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        if (Path.IsPathRooted(path))
+        {
+            return File.Exists(path) ? path : null;
+        }
+
+        var systemPath = Path.Combine(Environment.SystemDirectory, path);
+        if (File.Exists(systemPath))
+        {
+            return systemPath;
+        }
+
+        var windowsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), path);
+        if (File.Exists(windowsPath))
+        {
+            return windowsPath;
+        }
+
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                continue;
+            }
+
+            try
+            {
+                var candidate = Path.Combine(directory.Trim(), path);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+            catch
+            {
+                // Ignore malformed PATH entries.
+            }
+        }
+
+        return null;
+    }
+
+    public static bool IsResolvableIconLocation(AppIconLocation? location)
+    {
+        if (location is null)
+        {
+            return false;
+        }
+
+        var path = Environment.ExpandEnvironmentVariables(location.Path.Trim().Trim('"'));
+        if (path.StartsWith(AppsFolderPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return IsInstalledShellApplication(path[AppsFolderPrefix.Length..]);
+        }
+
+        if (path.StartsWith(AppsFolderGuidPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return IsInstalledShellApplication(path[AppsFolderGuidPrefix.Length..]);
+        }
+
+        if (path.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (path.StartsWith("@{", StringComparison.Ordinal))
+        {
+            return IsInstalledPackagedResource(path);
+        }
+
+        if (path.StartsWith('@') && !path.StartsWith("@{", StringComparison.Ordinal))
+        {
+            path = path[1..].Trim().Trim('"');
+        }
+
+        if (Path.IsPathRooted(path))
+        {
+            return File.Exists(path);
+        }
+
+        return File.Exists(Path.Combine(Environment.SystemDirectory, path))
+            || File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), path));
+    }
+
+    private static bool IsInstalledPackagedResource(string reference)
+    {
+        var content = reference.Trim();
+        if (!content.StartsWith("@{", StringComparison.Ordinal) || !content.EndsWith('}'))
+        {
+            return false;
+        }
+
+        content = content[2..^1];
+        var queryIndex = content.IndexOf('?');
+        if (queryIndex <= 0)
+        {
+            return false;
+        }
+
+        return FindPackageRoot(content[..queryIndex]) is not null;
+    }
+
+    private static string? FindPackageRoot(string packageFullName)
+    {
+        foreach (var root in ReadPackageRootCandidates(packageFullName))
+        {
+            if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
+            {
+                return root;
+            }
+        }
+
+        var windowsApps = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "WindowsApps");
+        var exactPath = Path.Combine(windowsApps, packageFullName);
+        return Directory.Exists(exactPath) ? exactPath : null;
+    }
+
+    private static IEnumerable<string?> ReadPackageRootCandidates(string packageFullName)
+    {
+        using var packageKey = Registry.ClassesRoot.OpenSubKey(
+            $@"Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages\{packageFullName}");
+
+        yield return packageKey?.GetValue("Path") as string;
+        yield return packageKey?.GetValue("PackageRootFolder") as string;
+        yield return packageKey?.GetValue("InstallLocation") as string;
+    }
+
+    private static bool CanCreateAppsFolderItem(string appUserModelId)
+    {
+        return CanCreateShellItem($"{AppsFolderPrefix}{appUserModelId}")
+            || CanCreateShellItem($"{AppsFolderGuidPrefix}{appUserModelId}");
+    }
+
+    private static bool CanCreateShellItem(string parsingName)
+    {
+        var iid = IidIUnknown;
+        var result = SHCreateItemFromParsingName(parsingName, IntPtr.Zero, ref iid, out var shellItem);
+        if (result < 0 || shellItem is null)
+        {
+            return false;
+        }
+
+        Marshal.ReleaseComObject(shellItem);
+        return true;
     }
 
     private static AppIconLocation? ParseIconLocation(string? value)
@@ -532,6 +895,13 @@ public sealed class FileAssociationService
         string? extra,
         StringBuilder output,
         ref uint outputLength);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHCreateItemFromParsingName(
+        string path,
+        IntPtr bindContext,
+        ref Guid riid,
+        [MarshalAs(UnmanagedType.IUnknown)] out object? shellItem);
 
     private enum AssocFlags
     {

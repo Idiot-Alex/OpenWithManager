@@ -32,15 +32,22 @@ public sealed class ShellAssociationService
                 {
                     var handlerName = ReadComString(handler.GetName);
                     var appName = ReadComString(handler.GetUIName) ?? handlerName;
-                    if (string.IsNullOrWhiteSpace(appName))
+                    if (!FileAssociationService.IsUsableAppName(appName))
+                    {
+                        continue;
+                    }
+
+                    var shellIcon = FileAssociationService.ReadShellApplicationIconLocation(handlerName);
+                    var handlerIcon = ReadIconLocation(handler);
+                    if (shellIcon is null && !FileAssociationService.IsResolvableIconLocation(handlerIcon))
                     {
                         continue;
                     }
 
                     yield return new FormatAppCandidate(
-                        appName,
+                        appName!,
                         null,
-                        FileAssociationService.ReadShellApplicationIconLocation(handlerName) ?? ReadIconLocation(handler),
+                        handlerIcon ?? shellIcon,
                         source,
                         false);
                 }

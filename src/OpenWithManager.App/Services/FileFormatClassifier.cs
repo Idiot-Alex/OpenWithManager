@@ -256,6 +256,8 @@ public static class FileFormatClassifier
         [".url"] = "settings"
     };
 
+    public static IReadOnlyCollection<string> KnownExtensions { get; } = ExtensionCategories.Keys.ToArray();
+
     public static string Classify(FileAssociationItem item)
     {
         var extension = NormalizeExtension(item.Extension);

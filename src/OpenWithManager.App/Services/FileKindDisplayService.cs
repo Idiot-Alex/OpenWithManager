@@ -47,16 +47,26 @@ public sealed class FileKindDisplayService
         return IsFileKindName(displayName, kind) ? T("defaultAppSet") : displayName;
     }
 
+    public string DisplayAssociationAppName(FileAssociationItem? item, FileKindSummary kind)
+    {
+        return item is null ? DisplaySummaryAppName(null, kind) : DisplaySummaryAppName(GetAssociationAppName(item), kind);
+    }
+
     public IReadOnlyCollection<AppIconBadge> BuildAppBadges(FileKindSummary kind)
     {
         var appGroups = kind.Items
-            .Where(item => !string.IsNullOrWhiteSpace(item.ProgId))
-            .GroupBy(item => DisplayAppKey(item.FriendlyName ?? item.ProgId), StringComparer.OrdinalIgnoreCase)
+            .Select(item => new
+            {
+                Item = item,
+                AppName = GetAssociationAppName(item)
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.AppName))
+            .GroupBy(item => DisplayAppKey(item.AppName), StringComparer.OrdinalIgnoreCase)
             .Select(group => new
             {
-                AppName = DisplaySummaryAppName(group.First().FriendlyName ?? group.First().ProgId, kind),
+                AppName = DisplaySummaryAppName(group.First().AppName, kind),
                 Count = group.Count(),
-                Icon = group.Select(item => item.Icon).FirstOrDefault(icon => icon is not null)
+                Icon = group.Select(item => item.Item.Icon).FirstOrDefault(icon => icon is not null)
             })
             .OrderByDescending(group => group.Count)
             .ThenBy(group => group.AppName)
@@ -79,10 +89,16 @@ public sealed class FileKindDisplayService
     private int CountDistinctApps(FileKindSummary kind)
     {
         return kind.Items
-            .Where(item => !string.IsNullOrWhiteSpace(item.ProgId))
-            .Select(item => DisplayAppKey(item.FriendlyName ?? item.ProgId))
+            .Select(GetAssociationAppName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(DisplayAppKey)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
+    }
+
+    private static string? GetAssociationAppName(FileAssociationItem item)
+    {
+        return FileAssociationService.ReadVerifiedAppName(item);
     }
 
     private string DisplayAppName(string? name)

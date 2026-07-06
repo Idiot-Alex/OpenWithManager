@@ -60,11 +60,19 @@ public partial class MainWindow : Window
 
         try
         {
-            var kinds = await Task.Run(() => _fileKinds.GetFileKinds());
-            _state.AllKinds = kinds;
-            _state.SelectedKind = _state.SelectedKind is null
-                ? _state.AllKinds.FirstOrDefault()
-                : _state.AllKinds.FirstOrDefault(kind => kind.Id == _state.SelectedKind.Id) ?? _state.AllKinds.FirstOrDefault();
+            var progress = new Progress<IReadOnlyList<FileKindSummary>>(kinds =>
+            {
+                if (!_state.IsLoading || kinds.Count == 0)
+                {
+                    return;
+                }
+
+                SetLoadedKinds(kinds);
+                ApplyFilter(false);
+            });
+
+            var kinds = await Task.Run(() => _fileKinds.GetFileKinds(progress));
+            SetLoadedKinds(kinds);
         }
         catch (Exception ex)
         {
@@ -79,7 +87,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ApplyFilter()
+    private void SetLoadedKinds(IReadOnlyList<FileKindSummary> kinds)
+    {
+        var selectedId = _state.SelectedKind?.Id;
+        _state.AllKinds = kinds.ToList();
+        _state.SelectedKind = selectedId is null
+            ? _state.AllKinds.FirstOrDefault()
+            : _state.AllKinds.FirstOrDefault(kind => kind.Id == selectedId) ?? _state.AllKinds.FirstOrDefault();
+    }
+
+    private void ApplyFilter(bool selectFirstFormat = true)
     {
         var visible = _state.AllKinds
             .Where(MatchesFilter)
@@ -109,7 +126,10 @@ public partial class MainWindow : Window
         UpdateStaticText();
         UpdateFilterButtons();
         RenderDetail();
-        _ = SelectFirstFormatIfNeededAsync();
+        if (selectFirstFormat)
+        {
+            _ = SelectFirstFormatIfNeededAsync();
+        }
     }
 
     private bool MatchesFilter(FileKindSummary kind)
@@ -198,6 +218,10 @@ public partial class MainWindow : Window
         }
 
         AddFileKindOverview(_state.SelectedKind);
+        if (_state.IsLoading)
+        {
+            AddHeaderMuted(t("readingDefaultsBody"));
+        }
 
         if (_state.SelectedFormat is not null)
         {
@@ -305,7 +329,7 @@ public partial class MainWindow : Window
         }
 
         holder.Child = badge.Icon is null
-            ? MakeGenericAppGlyph(13)
+            ? MakeGenericAppGlyph(badge.Label, 13)
             : new Image
             {
                 Source = badge.Icon,
@@ -552,7 +576,7 @@ public partial class MainWindow : Window
         };
 
         holder.Child = icon is null
-            ? MakeGenericAppGlyph(holderSize >= 30 ? 14 : 12)
+            ? MakeGenericAppGlyph(appName, holderSize >= 30 ? 14 : 12)
             : new Image
             {
                 Source = icon,
@@ -565,37 +589,23 @@ public partial class MainWindow : Window
         return holder;
     }
 
-    private static FrameworkElement MakeGenericAppGlyph(double size)
+    private static FrameworkElement MakeGenericAppGlyph(string appName, double size)
     {
-        var grid = new Grid
+        return new TextBlock
         {
-            Width = size,
-            Height = size,
+            Text = GetAppInitial(appName),
+            FontSize = size,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = UiBrush(UiMutedColor),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        grid.RowDefinitions.Add(new RowDefinition());
-        grid.RowDefinitions.Add(new RowDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+    }
 
-        for (var row = 0; row < 2; row++)
-        {
-            for (var column = 0; column < 2; column++)
-            {
-                var cell = new Border
-                {
-                    Margin = new Thickness(1.5),
-                    Background = UiBrush(UiMutedColor),
-                    CornerRadius = new CornerRadius(1.5)
-                };
-                Grid.SetRow(cell, row);
-                Grid.SetColumn(cell, column);
-                grid.Children.Add(cell);
-            }
-        }
-
-        return grid;
+    private static string GetAppInitial(string appName)
+    {
+        var initial = appName.FirstOrDefault(char.IsLetterOrDigit);
+        return initial == default ? "?" : char.ToUpperInvariant(initial).ToString();
     }
 
     private async Task OpenDefaultSettingsAsync()
@@ -714,7 +724,7 @@ public partial class MainWindow : Window
             rows.Children.Add(MakeFormatRowButton(
                 extension,
                 item?.Description ?? extension,
-                _fileKindDisplay.DisplaySummaryAppName(item?.FriendlyName ?? item?.ProgId, kind),
+                _fileKindDisplay.DisplayAssociationAppName(item, kind),
                 item?.Icon,
                 isSelected));
         }

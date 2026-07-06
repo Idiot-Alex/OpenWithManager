@@ -20,10 +20,13 @@ public sealed class FormatCandidateService
         var currentItem = _fileAssociations.GetAssociation(normalizedExtension);
 
         var candidates = new List<FormatAppCandidate>();
-        if (!string.IsNullOrWhiteSpace(currentItem.ProgId))
+        var currentAppName = FileAssociationService.ReadVerifiedAppName(currentItem);
+        if (!string.IsNullOrWhiteSpace(currentItem.ProgId)
+            && FileAssociationService.HasProgIdApplicationEvidence(currentItem.ProgId)
+            && FileAssociationService.IsUsableAppName(currentAppName, currentItem.Description, currentItem.Description))
         {
             candidates.Add(new FormatAppCandidate(
-                currentItem.FriendlyName ?? currentItem.ProgId!,
+                currentAppName!,
                 currentItem.ProgId,
                 currentItem.Icon,
                 "Current",
@@ -31,12 +34,12 @@ public sealed class FormatCandidateService
         }
 
         candidates.AddRange(_shellAssociations.GetHandlers(normalizedExtension));
-        candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem.ProgId));
+        candidates.AddRange(ReadOpenWithProgIds(normalizedExtension, currentItem.ProgId, currentItem.Description));
         candidates.AddRange(ReadOpenWithList(normalizedExtension));
         candidates.AddRange(ReadRegisteredApplications(normalizedExtension, currentItem.ProgId));
 
         var distinctCandidates = candidates
-            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.AppName))
+            .Where(candidate => FileAssociationService.IsUsableAppName(candidate.AppName, currentItem.Description, currentItem.Description))
             .GroupBy(CandidateKey, StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
@@ -72,7 +75,7 @@ public sealed class FormatCandidateService
             distinctCandidates);
     }
 
-    private static IEnumerable<FormatAppCandidate> ReadOpenWithProgIds(string extension, string? currentProgId)
+    private static IEnumerable<FormatAppCandidate> ReadOpenWithProgIds(string extension, string? currentProgId, string description)
     {
         using var key = Registry.CurrentUser.OpenSubKey(
             $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithProgids");
@@ -84,11 +87,27 @@ public sealed class FormatCandidateService
 
         foreach (var progId in key.GetValueNames().Where(value => !string.IsNullOrWhiteSpace(value)))
         {
-            var appName = FileAssociationService.ReadFriendlyName(progId) ?? progId;
-            yield return new FormatAppCandidate(
-                appName,
+            if (!string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase)
+                && !FileAssociationService.HasProgIdRegisteredApplicationEvidence(progId))
+            {
+                continue;
+            }
+
+            var icon = FileAssociationService.ReadIconLocation(progId);
+            var appName = FileAssociationService.ReadVerifiedAppName(
                 progId,
-                FileAssociationService.ReadIconLocation(progId),
+                icon,
+                FileAssociationService.ReadFriendlyName(progId),
+                description);
+            if (!FileAssociationService.IsUsableAppName(appName))
+            {
+                continue;
+            }
+
+            yield return new FormatAppCandidate(
+                appName!,
+                progId,
+                icon,
                 "OpenWithProgids",
                 string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase));
         }
@@ -108,6 +127,11 @@ public sealed class FormatCandidateService
         {
             var executableName = key.GetValue(valueName) as string;
             if (string.IsNullOrWhiteSpace(executableName))
+            {
+                continue;
+            }
+
+            if (!FileAssociationService.HasApplicationEvidence(executableName))
             {
                 continue;
             }
@@ -157,8 +181,19 @@ public sealed class FormatCandidateService
 
             using var capabilities = hive.OpenSubKey(capabilitiesPath);
             using var associations = hive.OpenSubKey($@"{capabilitiesPath}\FileAssociations");
+            if (capabilities is null)
+            {
+                continue;
+            }
+
             var progId = associations?.GetValue(extension) as string;
             if (string.IsNullOrWhiteSpace(progId))
+            {
+                continue;
+            }
+
+            if (!string.Equals(progId, currentProgId, StringComparison.OrdinalIgnoreCase)
+                && !FileAssociationService.HasRegisteredApplicationEvidence(hive, capabilitiesPath, valueName, progId))
             {
                 continue;
             }
