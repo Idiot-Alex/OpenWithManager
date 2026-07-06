@@ -40,29 +40,8 @@ public sealed class FormatCandidateService
 
         var distinctCandidates = candidates
             .Where(candidate => FileAssociationService.IsUsableAppName(candidate.AppName, currentItem.Description, currentItem.Description))
-            .GroupBy(CandidateKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group =>
-            {
-                var selected = group
-                    .OrderByDescending(candidate => candidate.IsCurrent)
-                    .ThenBy(SourcePriority)
-                    .First();
-                var settingsTarget = group.FirstOrDefault(candidate =>
-                    !string.IsNullOrWhiteSpace(candidate.SettingsParameterName)
-                    && !string.IsNullOrWhiteSpace(candidate.SettingsParameterValue));
-                var iconTarget = group
-                    .Where(candidate => candidate.Icon is not null)
-                    .OrderBy(IconSourcePriority)
-                    .ThenBy(SourcePriority)
-                    .FirstOrDefault();
-
-                return selected with
-                {
-                    Icon = iconTarget?.Icon ?? selected.Icon,
-                    SettingsParameterName = settingsTarget?.SettingsParameterName ?? selected.SettingsParameterName,
-                    SettingsParameterValue = settingsTarget?.SettingsParameterValue ?? selected.SettingsParameterValue
-                };
-            })
+            .GroupBy(AppCandidateIdentityService.GetIdentityKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => AppCandidateIdentityService.MergeCandidates(group, SourcePriority, IconSourcePriority))
             .OrderByDescending(candidate => candidate.IsCurrent)
             .ThenBy(SourcePriority)
             .ThenBy(candidate => candidate.AppName)
@@ -217,34 +196,6 @@ public sealed class FormatCandidateService
     {
         using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{executableName}\Application");
         return FileAssociationService.ResolveDisplayName(key?.GetValue("ApplicationName") as string);
-    }
-
-    private static string CandidateKey(FormatAppCandidate candidate)
-    {
-        var iconIdentity = NormalizeIconIdentity(candidate.Icon);
-        if (!string.IsNullOrWhiteSpace(iconIdentity))
-        {
-            return $"icon:{iconIdentity}";
-        }
-
-        var appIdentity = AppIdentityService.NormalizeAppName(candidate.AppName);
-        if (!string.IsNullOrWhiteSpace(appIdentity))
-        {
-            return $"app:{appIdentity}";
-        }
-
-        return !string.IsNullOrWhiteSpace(candidate.ProgId) ? $"prog:{candidate.ProgId}" : "";
-    }
-
-    private static string NormalizeIconIdentity(AppIconLocation? icon)
-    {
-        if (icon is null || string.IsNullOrWhiteSpace(icon.Path))
-        {
-            return "";
-        }
-
-        var path = Environment.ExpandEnvironmentVariables(icon.Path.Trim().Trim('"'));
-        return string.IsNullOrWhiteSpace(path) ? "" : $"{path.ToLowerInvariant()}#{icon.Index}";
     }
 
     private static int IconSourcePriority(FormatAppCandidate candidate)

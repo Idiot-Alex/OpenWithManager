@@ -579,7 +579,8 @@ public partial class MainWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             BorderBrush = UiBrush(isSelected ? UiInkColor : UiLineColor),
             Background = UiBrush(isSelected ? UiSelectedColor : UiSurfaceColor),
-            Content = content
+            Content = content,
+            ToolTip = _preferences.ShowCandidateSources ? AppCandidateIdentityService.FormatDiagnostic(candidate) : null
         };
         button.Click += (_, _) =>
         {
