@@ -221,6 +221,12 @@ public sealed class FormatCandidateService
 
     private static string CandidateKey(FormatAppCandidate candidate)
     {
+        var iconIdentity = NormalizeIconIdentity(candidate.Icon);
+        if (!string.IsNullOrWhiteSpace(iconIdentity))
+        {
+            return $"icon:{iconIdentity}";
+        }
+
         var appIdentity = AppIdentityService.NormalizeAppName(candidate.AppName);
         if (!string.IsNullOrWhiteSpace(appIdentity))
         {
@@ -230,16 +236,26 @@ public sealed class FormatCandidateService
         return !string.IsNullOrWhiteSpace(candidate.ProgId) ? $"prog:{candidate.ProgId}" : "";
     }
 
+    private static string NormalizeIconIdentity(AppIconLocation? icon)
+    {
+        if (icon is null || string.IsNullOrWhiteSpace(icon.Path))
+        {
+            return "";
+        }
+
+        var path = Environment.ExpandEnvironmentVariables(icon.Path.Trim().Trim('"'));
+        return string.IsNullOrWhiteSpace(path) ? "" : $"{path.ToLowerInvariant()}#{icon.Index}";
+    }
+
     private static int IconSourcePriority(FormatAppCandidate candidate)
     {
         return candidate.Source switch
         {
             "ShellRecommended" => 0,
-            "ShellHandler" => 1,
-            "RegisteredApplication" => 2,
-            "Current" => 3,
-            "OpenWithList" => 4,
-            "OpenWithProgids" => 5,
+            "RegisteredApplication" => 1,
+            "Current" => 2,
+            "OpenWithList" => 3,
+            "OpenWithProgids" => 4,
             _ => 6
         };
     }
@@ -251,9 +267,8 @@ public sealed class FormatCandidateService
             "Current" => 0,
             "ShellRecommended" => 1,
             "RegisteredApplication" => 2,
-            "ShellHandler" => 3,
-            "OpenWithProgids" => 4,
-            "OpenWithList" => 5,
+            "OpenWithProgids" => 3,
+            "OpenWithList" => 4,
             _ => 6
         };
     }

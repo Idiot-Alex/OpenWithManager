@@ -596,7 +596,8 @@ public partial class MainWindow : Window
 
     private FrameworkElement MakeAppIcon(AppIconLocation? location, string appName, double holderSize, double iconSize, Thickness margin)
     {
-        var icon = IsUnsetAppName(appName) ? null : _icons.GetIcon(location);
+        var isUnset = IsUnsetAppName(appName);
+        var icon = isUnset ? null : _icons.GetIcon(location);
         var holder = new Border
         {
             Width = holderSize,
@@ -609,7 +610,7 @@ public partial class MainWindow : Window
         };
 
         holder.Child = icon is null
-            ? MakeGenericAppGlyph(appName, holderSize >= 30 ? 14 : 12)
+            ? MakeGenericAppGlyph(appName, holderSize >= 30 ? 14 : 12, isUnset)
             : new Image
             {
                 Source = icon,
@@ -622,11 +623,11 @@ public partial class MainWindow : Window
         return holder;
     }
 
-    private static FrameworkElement MakeGenericAppGlyph(string appName, double size)
+    private static FrameworkElement MakeGenericAppGlyph(string appName, double size, bool isUnset = false)
     {
         return new TextBlock
         {
-            Text = GetAppInitial(appName),
+            Text = isUnset ? "?" : GetAppInitial(appName),
             FontSize = size,
             FontWeight = FontWeights.SemiBold,
             Foreground = UiBrush(UiMutedColor),
@@ -637,11 +638,6 @@ public partial class MainWindow : Window
 
     private static string GetAppInitial(string appName)
     {
-        if (IsUnsetAppName(appName))
-        {
-            return "?";
-        }
-
         var initial = appName.FirstOrDefault(char.IsLetterOrDigit);
         return initial == default ? "?" : char.ToUpperInvariant(initial).ToString();
     }
@@ -991,9 +987,11 @@ public partial class MainWindow : Window
         return string.IsNullOrWhiteSpace(name) || name == "No default app" ? t("noDefaultApp") : name;
     }
 
-    private static bool IsUnsetAppName(string? name)
+    private bool IsUnsetAppName(string? name)
     {
-        return string.IsNullOrWhiteSpace(name) || string.Equals(name, "No default app", StringComparison.OrdinalIgnoreCase);
+        return string.IsNullOrWhiteSpace(name)
+            || string.Equals(name, "No default app", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, t("noDefaultApp"), StringComparison.OrdinalIgnoreCase);
     }
 
     private string FormatActionLabel(FormatAppCandidate? candidate)
@@ -1019,7 +1017,6 @@ public partial class MainWindow : Window
         {
             "Current" => t("current"),
             "RegisteredApplication" or "ShellRecommended" => t("recommended"),
-            "ShellHandler" => t("availableApp"),
             "OpenWithProgids" => t("knownForFormat"),
             "OpenWithList" => t("usedBefore"),
             _ => source

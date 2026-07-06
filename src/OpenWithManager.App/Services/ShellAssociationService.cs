@@ -9,7 +9,6 @@ public sealed class ShellAssociationService
     {
         var candidates = new List<FormatAppCandidate>();
         candidates.AddRange(ReadHandlers(extension, AssocFilter.Recommended, "ShellRecommended"));
-        candidates.AddRange(ReadHandlers(extension, AssocFilter.None, "ShellHandler"));
         return candidates;
     }
 
